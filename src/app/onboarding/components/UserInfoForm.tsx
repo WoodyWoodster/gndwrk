@@ -1,13 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export default function UserInfoForm({ updateFormData }) {
-    const [name, setName] = useState('')
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
+interface UserInfoFormProps {
+    updateFormData: (step: string, data: any) => void
+    initialData: {
+        name: string
+        email: string
+        password: string
+    }
+}
+
+const UserInfoForm: React.FC<UserInfoFormProps> = ({
+    updateFormData,
+    initialData
+}) => {
+    const [name, setName] = useState(initialData.name)
+    const [email, setEmail] = useState(initialData.email)
+    const [password, setPassword] = useState(initialData.password)
 
     const handleInputChange = (field: string, value: string) => {
         if (field === 'name') setName(value)
@@ -52,3 +64,5 @@ export default function UserInfoForm({ updateFormData }) {
         </div>
     )
 }
+
+export default UserInfoForm
