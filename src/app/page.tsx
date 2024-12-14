@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, BarChart2, Users, Layers, Zap } from 'lucide-react'
+import PricingInfo from './components/PricingInfo'
 
 export default function Home() {
     return (
@@ -22,7 +23,7 @@ export default function Home() {
                             </li>
                             <li>
                                 <Link
-                                    href="#"
+                                    href="#pricing"
                                     className="text-muted-foreground hover:text-primary"
                                 >
                                     Pricing
@@ -121,6 +122,15 @@ export default function Home() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </section>
+
+                <section id="pricing" className="py-20 bg-muted/50">
+                    <div className="container mx-auto px-4">
+                        <h2 className="text-3xl font-bold text-center mb-12">
+                            Pricing
+                        </h2>
+                        <PricingInfo />
                     </div>
                 </section>
 
