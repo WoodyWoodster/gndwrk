@@ -6,6 +6,9 @@ import { CheckCircle2 } from 'lucide-react'
 import CompanyInfoForm from './components/CompanyInfoForm'
 import UserInfoForm from './components/UserInfoForm'
 import { Progress } from '@/components/ui/progress'
+import BulkUpload from './components/BulkUpload'
+import SubscriptionSelection from './components/SubscriptionSelection'
+import Checkout from './components/Checkout'
 
 const steps = [
     'Company Info',
@@ -88,6 +91,22 @@ export default function Onboarding() {
                         initialData={formData.userInfo}
                     />
                 )
+            case 2:
+                return (
+                    <BulkUpload
+                        updateFormData={updateFormData}
+                        initialData={formData.bulkUpload}
+                    />
+                )
+            case 3:
+                return (
+                    <SubscriptionSelection
+                        updateFormData={updateFormData}
+                        initialData={formData.subscription}
+                    />
+                )
+            case 4:
+                return <Checkout formData={formData} />
             default:
                 return null
         }
