@@ -140,7 +140,7 @@ export default function Home() {
                             Ready to Transform Your Business?
                         </h2>
                         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            Join thousands of companies that trust Gndwrk ERP to
+                            Join companies that trust Gndwrk ERP to
                             drive their business forward.
                         </p>
                         <Button size="lg" asChild>
