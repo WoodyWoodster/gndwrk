@@ -59,7 +59,7 @@ export default function Home() {
                 <section className="bg-background py-20">
                     <div className="container mx-auto px-4 text-center">
                         <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                            Streamline Your Business with Gndwrk ERP
+                            Streamline Your Business with Gndwrk
                         </h1>
                         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
                             Empower your organization with our comprehensive
@@ -140,7 +140,7 @@ export default function Home() {
                             Ready to Transform Your Business?
                         </h2>
                         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            Join companies that trust Gndwrk ERP to
+                            Join companies that trust Gndwrk to
                             drive their business forward.
                         </p>
                         <Button size="lg" asChild>
@@ -306,7 +306,7 @@ export default function Home() {
                         </div>
                     </div>
                     <div className="mt-12 pt-8 border-t border-muted-foreground/20 text-center text-muted-foreground">
-                        <p>&copy; 2024 Gndwrk ERP. All rights reserved.</p>
+                        <p>&copy; 2024 Gndwrk. All rights reserved.</p>
                     </div>
                 </div>
             </footer>
