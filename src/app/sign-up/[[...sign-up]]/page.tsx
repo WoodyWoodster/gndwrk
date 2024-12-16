@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Icons } from '@/components/ui/icons'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 export default function SignUpPage() {
   return (
@@ -67,9 +68,9 @@ export default function SignUpPage() {
                         </Button>
                       </SignUp.Action>
                       <Button variant="link" size="sm" asChild>
-                        <Clerk.Link navigate="sign-in">
+                        <Link href="/sign-in">
                           Already have an account? Sign in
-                        </Clerk.Link>
+                        </Link>
                       </Button>
                     </div>
                   </CardFooter>
