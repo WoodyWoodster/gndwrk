@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, BarChart2, Users, Layers, Zap } from 'lucide-react'
 import PricingInfo from './components/PricingInfo'
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
 
 export default function Home() {
     return (
@@ -48,10 +49,18 @@ export default function Home() {
                         </ul>
                     </nav>
                     <div className="hidden sm:block">
+                        <SignedOut>
+                            <SignInButton />
+                        </SignedOut>
+                        <SignedIn>
+                            <UserButton />
+                        </SignedIn>
+                    </div>
+                    {/* <div className="hidden sm:block">
                         <Button asChild>
                             <Link href="/onboarding">Get Started</Link>
                         </Button>
-                    </div>
+                    </div> */}
                 </div>
             </header>
 
@@ -140,8 +149,8 @@ export default function Home() {
                             Ready to Transform Your Business?
                         </h2>
                         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            Join companies that trust Gndwrk to
-                            drive their business forward.
+                            Join companies that trust Gndwrk to drive their
+                            business forward.
                         </p>
                         <Button size="lg" asChild>
                             <Link href="/onboarding">
