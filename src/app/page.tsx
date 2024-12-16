@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowRight, BarChart2, Users, Layers, Zap } from 'lucide-react'
 import PricingInfo from './components/PricingInfo'
 import { UserButton } from './components/UserButton'
-import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs'
+import { SignedIn, SignedOut } from '@clerk/nextjs'
 
 export default function Home() {
   return (
@@ -51,7 +51,9 @@ export default function Home() {
           </nav>
           <div className="hidden sm:block">
             <SignedOut>
-              <SignInButton />
+              <Button>
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
             </SignedOut>
             <SignedIn>
               <UserButton />
