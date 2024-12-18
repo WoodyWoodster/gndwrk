@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Icons } from '@/components/ui/icons'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
+import { Mountain } from 'lucide-react'
 
 export default function SignUpPage() {
   return (
@@ -26,8 +27,13 @@ export default function SignUpPage() {
               <SignUp.Step name="start">
                 <Card className="w-full sm:w-96">
                   <CardHeader>
-                    <CardTitle>Create your account</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="flex flex-col items-center mb-3">
+                      <Mountain className="w-12 h-12 mb-2" /> 
+                      <Link href="/" className="text-2xl font-bold text-primary">
+                        Gndwrk
+                      </Link>
+                    </CardTitle>
+                    <CardDescription className='flex justify-center'>
                       Welcome! Please fill in the details to get started.
                     </CardDescription>
                   </CardHeader>
