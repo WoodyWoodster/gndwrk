@@ -5,20 +5,31 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/ui/icons'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 
 interface OrganizationFormProps {
-  onSubmit: (orgName: string, address: {
-    street: string,
-    city: string,
-    state: string,
-    zipCode: string,
-    country: string
+  onSubmit: (orgDetails: {
+    name: string,
+    website: string,
+    industry: string,
+    size: string,
+    description: string,
+    address: {
+      street: string,
+      city: string,
+      state: string,
+      zipCode: string,
+      country: string
+    }
   }) => Promise<void>
 }
 
 export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
   const [orgName, setOrgName] = useState('')
+  const [website, setWebsite] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [size, setSize] = useState('')
+  const [description, setDescription] = useState('')
   const [street, setStreet] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
@@ -32,7 +43,14 @@ export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
     setIsLoading(true)
     setError(null)
     try {
-      await onSubmit(orgName, { street, city, state, zipCode, country })
+      await onSubmit({
+        name: orgName,
+        website,
+        industry,
+        size,
+        description,
+        address: { street, city, state, zipCode, country }
+      })
     } catch (err) {
       setError('Failed to create organization. Please try again.')
       console.error(err)
@@ -60,8 +78,57 @@ export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
+              <Input
+                id="website"
+                type="url"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="industry">Industry</Label>
+              <Select value={industry} onValueChange={setIndustry}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an industry" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="technology">Technology</SelectItem>
+                  <SelectItem value="healthcare">Healthcare</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="education">Education</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="size">Organization Size</Label>
+              <Select value={size} onValueChange={setSize}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select organization size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1-10">1-10 employees</SelectItem>
+                  <SelectItem value="11-50">11-50 employees</SelectItem>
+                  <SelectItem value="51-200">51-200 employees</SelectItem>
+                  <SelectItem value="201-500">201-500 employees</SelectItem>
+                  <SelectItem value="501+">501+ employees</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description of your organization"
+                rows={3}
+              />
+            </div>
           </div>
-          <Separator />
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Address Information</h3>
             <div className="space-y-2">
@@ -105,13 +172,12 @@ export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
-                <Select defaultValue={country} onValueChange={setCountry}>
+                <Select value={country} onValueChange={setCountry}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a country" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USA">United States</SelectItem>
-                    {/* Add more countries as needed */}
                   </SelectContent>
                 </Select>
               </div>
