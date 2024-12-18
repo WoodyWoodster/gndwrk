@@ -20,15 +20,6 @@ export async function POST(request: Request) {
 
     console.log('Organization created:', organization)
 
-    // Add the creating user as an admin of the organization
-    const membership = await client.organizations.createOrganizationMembership({
-      organizationId: organization.id,
-      userId: userId,
-      role: 'admin',
-    })
-
-    console.log('Membership created:', membership)
-
     return NextResponse.json({ 
       message: 'Organization created successfully', 
       organizationId: organization.id 
