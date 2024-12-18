@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/ui/icons'
 
 interface OrganizationFormProps {
-  onSubmit: (orgName: string) => Promise<void>
+  onSubmit: (orgName: string, address: string) => Promise<void>
 }
 
 export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
   const [orgName, setOrgName] = useState('')
+  const [address, setAddress] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -19,10 +20,10 @@ export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
     setIsLoading(true)
     setError(null)
     try {
-      await onSubmit(orgName)
+      await onSubmit(orgName, address)
     } catch (err) {
       setError('Failed to create organization. Please try again.')
-      console.log(err)
+      console.error(err)
     } finally {
       setIsLoading(false)
     }
@@ -42,6 +43,15 @@ export function OrganizationForm({ onSubmit }: OrganizationFormProps) {
               id="orgName"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
               required
             />
           </div>
