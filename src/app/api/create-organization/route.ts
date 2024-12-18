@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { name, address } = await request.json()
+    const { name, address, website, industry, size, description } = await request.json()
     const client = await clerkClient()
 
     console.log('Creating organization:', name, address)
@@ -18,6 +18,10 @@ export async function POST(request: Request) {
       createdBy: userId,
       privateMetadata: {
         address: address,
+        website: website,
+        industry: industry,
+        size: size,
+        description: description,
       },
     })
 
