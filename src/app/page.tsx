@@ -11,7 +11,6 @@ import {
   Cloud,
   Smartphone
 } from 'lucide-react'
-import PricingInfo from './components/PricingInfo'
 import { UserButton } from './components/UserButton'
 import { SignedIn, SignedOut } from '@clerk/nextjs'
 
@@ -27,18 +26,10 @@ export default function Home() {
             <ul className="flex space-x-4">
               <li>
                 <Link
-                  href="#features"
+                  href="#our-expertise"
                   className="text-muted-foreground hover:text-primary"
                 >
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="#pricing"
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  Pricing
+                  Our Expertise
                 </Link>
               </li>
               <li>
@@ -93,7 +84,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="py-20 bg-muted/50">
+        <section id="our-expertise" className="py-20 bg-muted/50">
           <div className="container mx-auto px-4">
             <h2 className="text-3xl font-bold text-center mb-12">
               Our Expertise
@@ -156,6 +147,18 @@ export default function Home() {
           </div>
         </section>
 
+        {/* <section className="py-20 bg-muted/50">
+          <div className="container mx-auto px-4 text-center">
+            <h2 className="text-3xl font-bold mb-12">
+              Our Customers
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="flex items-center justify-center p-6 bg-background rounded-lg shadow-md">
+              </div>
+            </div>
+          </div>
+        </section> */}
+
         <section className="py-20">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-bold mb-6">
@@ -185,15 +188,7 @@ export default function Home() {
                     href="#"
                     className="text-muted-foreground hover:text-primary"
                   >
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#"
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    Pricing
+                    Our Expertise
                   </Link>
                 </li>
                 <li>
