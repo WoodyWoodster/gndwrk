@@ -1,6 +1,16 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, BarChart2, Users, Layers, Zap } from 'lucide-react'
+import {
+  ArrowRight,
+  BarChart2,
+  Users,
+  Layers,
+  Zap,
+  Shield,
+  Code,
+  Cloud,
+  Smartphone
+} from 'lucide-react'
 import PricingInfo from './components/PricingInfo'
 import { UserButton } from './components/UserButton'
 import { SignedIn, SignedOut } from '@clerk/nextjs'
@@ -86,29 +96,49 @@ export default function Home() {
         <section id="features" className="py-20 bg-muted/50">
           <div className="container mx-auto px-4">
             <h2 className="text-3xl font-bold text-center mb-12">
-              Key Features
+              Our Expertise
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {[
                 {
-                  icon: BarChart2,
-                  title: 'Advanced Analytics',
-                  description: 'Gain insights with powerful reporting tools'
-                },
-                {
-                  icon: Users,
-                  title: 'Human Resources',
-                  description: 'Streamline HR processes and employee management'
+                  icon: Code,
+                  title: 'Custom Development',
+                  description: 'Build tailored software solutions for unique business needs'
                 },
                 {
                   icon: Layers,
-                  title: 'Inventory Management',
-                  description: 'Optimize stock levels and supply chain'
+                  title: 'Scalable Architecture',
+                  description: 'Design systems that grow with your business'
+                },
+                {
+                  icon: Shield,
+                  title: 'Security',
+                  description: 'Ensure data protection and compliance'
+                },
+                {
+                  icon: BarChart2,
+                  title: 'Data Analytics',
+                  description: 'Gain insights with powerful reporting tools'
                 },
                 {
                   icon: Zap,
                   title: 'Automation',
                   description: 'Automate repetitive tasks and workflows'
+                },
+                {
+                  icon: Users,
+                  title: 'User Experience',
+                  description: 'Create intuitive and engaging user interfaces'
+                },
+                {
+                  icon: Cloud,
+                  title: 'Cloud Integration',
+                  description: 'Leverage the power of cloud computing'
+                },
+                {
+                  icon: Smartphone,
+                  title: 'Mobile Solutions',
+                  description: 'Develop mobile applications for on-the-go access'
                 }
               ].map((feature, index) => (
                 <div
