@@ -66,12 +66,13 @@ export default function Home() {
         <section className="bg-background py-20">
           <div className="container mx-auto px-4 text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Streamline Your Business with Gndwrk
+              Custom Software Solutions for Your Business
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Empower your organization with our comprehensive Enterprise
-              Resource Planning solution. Boost efficiency, reduce costs, and
-              make data-driven decisions.
+              Empower your organization with our custom software solutions.
+              Boost efficiency, reduce costs, and make data-driven decisions
+              with tailored applications designed specifically for your business
+              needs.
             </p>
             <Button size="lg" asChild>
               <Link href="/onboarding">
