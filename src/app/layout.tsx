@@ -6,9 +6,9 @@ import { ClerkProvider } from '@clerk/nextjs'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Gndwrk ERP - Streamline Your Business',
+  title: 'Gndwrk - Custom Software Solutions',
   description:
-    'Empower your organization with Gndwrk ERP, a comprehensive Enterprise Resource Planning solution.'
+    'Empower your organization with Gndwrk custom software solutions.'
 }
 
 export default function RootLayout({
