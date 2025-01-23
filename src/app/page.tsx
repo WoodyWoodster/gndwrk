@@ -156,13 +156,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="pricing" className="py-20 bg-muted/50">
-          <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12">Pricing</h2>
-            <PricingInfo />
-          </div>
-        </section>
-
         <section className="py-20">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-bold mb-6">
