@@ -164,6 +164,44 @@ export async function POST(req: Request) {
         });
         break;
 
+      // ============================================
+      // Subscription events
+      // ============================================
+      case "customer.subscription.created":
+        await convex.mutation(api.stripe.handleSubscriptionCreated, {
+          data: event.data.object as any,
+          ...eventMeta,
+        });
+        break;
+
+      case "customer.subscription.updated":
+        await convex.mutation(api.stripe.handleSubscriptionUpdated, {
+          data: event.data.object as any,
+          ...eventMeta,
+        });
+        break;
+
+      case "customer.subscription.deleted":
+        await convex.mutation(api.stripe.handleSubscriptionDeleted, {
+          data: event.data.object as any,
+          ...eventMeta,
+        });
+        break;
+
+      case "invoice.payment_succeeded":
+        await convex.mutation(api.stripe.handleInvoicePaymentSucceeded, {
+          data: event.data.object as any,
+          ...eventMeta,
+        });
+        break;
+
+      case "invoice.payment_failed":
+        await convex.mutation(api.stripe.handleInvoicePaymentFailed, {
+          data: event.data.object as any,
+          ...eventMeta,
+        });
+        break;
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }

@@ -82,6 +82,36 @@ const identityVerificationData = v.object({
   ),
 });
 
+// Subscription webhook data validators
+const subscriptionData = v.object({
+  id: v.string(),
+  customer: v.string(),
+  status: v.string(),
+  current_period_end: v.optional(v.number()),
+  trial_end: v.optional(v.union(v.number(), v.null())),
+  items: v.optional(
+    v.object({
+      data: v.array(
+        v.object({
+          price: v.object({
+            lookup_key: v.optional(v.union(v.string(), v.null())),
+          }),
+        })
+      ),
+    })
+  ),
+  metadata: v.optional(v.any()),
+});
+
+const invoiceData = v.object({
+  id: v.string(),
+  customer: v.string(),
+  subscription: v.optional(v.union(v.string(), v.null())),
+  status: v.optional(v.string()),
+  amount_paid: v.optional(v.number()),
+  amount_due: v.optional(v.number()),
+});
+
 // Helper to check and record processed events (idempotency)
 async function checkAndRecordEvent(
   ctx: any,
@@ -717,6 +747,297 @@ export const handleIdentityCanceled = mutation({
       "Identity verification canceled:",
       data.id,
       data.last_error?.reason
+    );
+  },
+});
+
+// ============================================
+// Subscription events
+// ============================================
+
+// Helper to map price lookup key to subscription tier
+function lookupKeyToTier(
+  lookupKey: string | null | undefined
+): "starter" | "family" | "familyplus" {
+  switch (lookupKey) {
+    case "family_monthly":
+      return "family";
+    case "familyplus_monthly":
+      return "familyplus";
+    default:
+      return "starter";
+  }
+}
+
+// Helper to map Stripe subscription status to our status
+function mapSubscriptionStatus(
+  stripeStatus: string
+): "active" | "past_due" | "canceled" | "trialing" | "incomplete" {
+  switch (stripeStatus) {
+    case "active":
+      return "active";
+    case "past_due":
+      return "past_due";
+    case "canceled":
+    case "unpaid":
+      return "canceled";
+    case "trialing":
+      return "trialing";
+    case "incomplete":
+    case "incomplete_expired":
+    default:
+      return "incomplete";
+  }
+}
+
+// Handle subscription created
+export const handleSubscriptionCreated = mutation({
+  args: {
+    data: subscriptionData,
+    eventId: v.optional(v.string()),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, { data, eventId, eventType }) => {
+    // Idempotency check
+    if (eventId && eventType) {
+      const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
+      if (!shouldProcess) return;
+    }
+
+    // Find user by Stripe customer ID
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("stripeCustomerId"), data.customer))
+      .unique();
+
+    if (!user) {
+      console.log("User not found for customer:", data.customer);
+      return;
+    }
+
+    // Get tier from price lookup key
+    const lookupKey = data.items?.data[0]?.price?.lookup_key;
+    const tier = lookupKeyToTier(lookupKey);
+    const status = mapSubscriptionStatus(data.status);
+
+    await ctx.db.patch(user._id, {
+      stripeSubscriptionId: data.id,
+      subscriptionTier: tier,
+      subscriptionStatus: status,
+      trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
+    });
+
+    console.log(
+      "Subscription created:",
+      data.id,
+      "Tier:",
+      tier,
+      "Status:",
+      status
+    );
+  },
+});
+
+// Handle subscription updated
+export const handleSubscriptionUpdated = mutation({
+  args: {
+    data: subscriptionData,
+    eventId: v.optional(v.string()),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, { data, eventId, eventType }) => {
+    // Idempotency check
+    if (eventId && eventType) {
+      const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
+      if (!shouldProcess) return;
+    }
+
+    // Find user by subscription ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_stripe_subscription", (q) =>
+        q.eq("stripeSubscriptionId", data.id)
+      )
+      .unique();
+
+    if (!user) {
+      // Try by customer ID as fallback
+      const userByCustomer = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("stripeCustomerId"), data.customer))
+        .unique();
+
+      if (!userByCustomer) {
+        console.log("User not found for subscription:", data.id);
+        return;
+      }
+
+      // Update with subscription ID
+      const lookupKey = data.items?.data[0]?.price?.lookup_key;
+      const tier = lookupKeyToTier(lookupKey);
+      const status = mapSubscriptionStatus(data.status);
+
+      await ctx.db.patch(userByCustomer._id, {
+        stripeSubscriptionId: data.id,
+        subscriptionTier: tier,
+        subscriptionStatus: status,
+        trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
+      });
+
+      return;
+    }
+
+    // Get tier from price lookup key
+    const lookupKey = data.items?.data[0]?.price?.lookup_key;
+    const tier = lookupKeyToTier(lookupKey);
+    const status = mapSubscriptionStatus(data.status);
+
+    await ctx.db.patch(user._id, {
+      subscriptionTier: tier,
+      subscriptionStatus: status,
+      trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
+    });
+
+    console.log(
+      "Subscription updated:",
+      data.id,
+      "Tier:",
+      tier,
+      "Status:",
+      status
+    );
+  },
+});
+
+// Handle subscription deleted (canceled)
+export const handleSubscriptionDeleted = mutation({
+  args: {
+    data: subscriptionData,
+    eventId: v.optional(v.string()),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, { data, eventId, eventType }) => {
+    // Idempotency check
+    if (eventId && eventType) {
+      const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
+      if (!shouldProcess) return;
+    }
+
+    // Find user by subscription ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_stripe_subscription", (q) =>
+        q.eq("stripeSubscriptionId", data.id)
+      )
+      .unique();
+
+    if (!user) {
+      console.log("User not found for subscription:", data.id);
+      return;
+    }
+
+    // Downgrade to starter tier
+    await ctx.db.patch(user._id, {
+      subscriptionTier: "starter",
+      subscriptionStatus: "canceled",
+      stripeSubscriptionId: undefined,
+      trialEndsAt: undefined,
+    });
+
+    console.log("Subscription deleted, downgraded to starter:", data.id);
+  },
+});
+
+// Handle invoice payment succeeded
+export const handleInvoicePaymentSucceeded = mutation({
+  args: {
+    data: invoiceData,
+    eventId: v.optional(v.string()),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, { data, eventId, eventType }) => {
+    // Idempotency check
+    if (eventId && eventType) {
+      const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
+      if (!shouldProcess) return;
+    }
+
+    if (!data.subscription) {
+      // Not a subscription invoice
+      return;
+    }
+
+    // Find user by subscription ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_stripe_subscription", (q) =>
+        q.eq("stripeSubscriptionId", data.subscription!)
+      )
+      .unique();
+
+    if (!user) {
+      console.log("User not found for subscription:", data.subscription);
+      return;
+    }
+
+    // Ensure status is active after successful payment
+    if (user.subscriptionStatus !== "active") {
+      await ctx.db.patch(user._id, {
+        subscriptionStatus: "active",
+      });
+    }
+
+    console.log(
+      "Invoice payment succeeded:",
+      data.id,
+      "Amount:",
+      data.amount_paid
+    );
+  },
+});
+
+// Handle invoice payment failed
+export const handleInvoicePaymentFailed = mutation({
+  args: {
+    data: invoiceData,
+    eventId: v.optional(v.string()),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, { data, eventId, eventType }) => {
+    // Idempotency check
+    if (eventId && eventType) {
+      const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
+      if (!shouldProcess) return;
+    }
+
+    if (!data.subscription) {
+      // Not a subscription invoice
+      return;
+    }
+
+    // Find user by subscription ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_stripe_subscription", (q) =>
+        q.eq("stripeSubscriptionId", data.subscription!)
+      )
+      .unique();
+
+    if (!user) {
+      console.log("User not found for subscription:", data.subscription);
+      return;
+    }
+
+    // Mark as past_due
+    await ctx.db.patch(user._id, {
+      subscriptionStatus: "past_due",
+    });
+
+    console.log(
+      "Invoice payment failed:",
+      data.id,
+      "Amount due:",
+      data.amount_due
     );
   },
 });

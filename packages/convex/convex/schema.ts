@@ -21,6 +21,25 @@ export default defineSchema({
         v.literal("failed")
       )
     ),
+    // Subscription fields
+    subscriptionTier: v.optional(
+      v.union(
+        v.literal("starter"),
+        v.literal("family"),
+        v.literal("familyplus")
+      )
+    ),
+    stripeSubscriptionId: v.optional(v.string()),
+    subscriptionStatus: v.optional(
+      v.union(
+        v.literal("active"),
+        v.literal("past_due"),
+        v.literal("canceled"),
+        v.literal("trialing"),
+        v.literal("incomplete")
+      )
+    ),
+    trialEndsAt: v.optional(v.number()), // timestamp for 14-day trial
     // Stats for profile
     choresCompleted: v.optional(v.number()),
     savingStreak: v.optional(v.number()),
@@ -28,7 +47,8 @@ export default defineSchema({
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
-    .index("by_family", ["familyId"]),
+    .index("by_family", ["familyId"])
+    .index("by_stripe_subscription", ["stripeSubscriptionId"]),
 
   // Families table - family unit
   families: defineTable({

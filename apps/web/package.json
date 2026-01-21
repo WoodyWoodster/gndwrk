@@ -10,17 +10,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.14",
     "@clerk/nextjs": "^6.10.0",
+    "@gndwrk/types": "workspace:*",
+    "ai": "^6.0.44",
+    "clsx": "^2.1.1",
     "convex": "^1.21.0",
     "convex-ents": "^0.12.0",
     "next": "^15.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^3.0.0",
-    "@gndwrk/types": "workspace:*",
+    "stripe": "^17.7.0",
     "svix": "^1.60.0",
-    "stripe": "^17.7.0"
+    "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

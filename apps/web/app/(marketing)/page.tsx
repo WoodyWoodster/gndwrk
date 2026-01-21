@@ -305,14 +305,14 @@ export default function HomePage() {
             Simple Family Pricing
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-gray-600">
-            One plan. Unlimited kids. No hidden fees.
+            Choose the plan that fits your family. No hidden fees.
           </p>
 
-          <div className="mx-auto mt-16 grid max-w-4xl gap-8 md:grid-cols-2">
-            {/* Free Plan */}
-            <div className="rounded-2xl border-2 border-gray-200 bg-white p-8">
+          <div className="mx-auto mt-16 grid max-w-6xl gap-8 md:grid-cols-3">
+            {/* Starter Plan */}
+            <div className="flex flex-col rounded-2xl border-2 border-gray-200 bg-white p-8 md:order-1">
               <div className="text-center">
-                <h3 className="text-xl font-semibold text-gray-900">Free</h3>
+                <h3 className="text-xl font-semibold text-gray-900">Starter</h3>
                 <div className="mt-4">
                   <span className="text-5xl font-bold text-gray-900">$0</span>
                   <span className="text-gray-500">/month</span>
@@ -322,7 +322,7 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <ul className="mt-8 space-y-4">
+              <ul className="mt-8 flex-1 space-y-4">
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
                   <span className="text-gray-700">1 child account</span>
@@ -333,15 +333,19 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
+                  <span className="text-gray-700">1 debit card ($5 shipping)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
                   <span className="text-gray-700">Basic chore tracking</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
-                  <span className="text-gray-700">Parent dashboard</span>
+                  <span className="text-gray-700">Basic Trust Score</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
-                  <span className="text-gray-700">Basic Trust Score</span>
+                  <span className="text-gray-700">Parent dashboard</span>
                 </li>
               </ul>
 
@@ -349,12 +353,12 @@ export default function HomePage() {
                 href="/sign-up"
                 className="mt-8 block w-full rounded-lg border-2 border-gray-300 py-3 text-center font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50"
               >
-                Try Free
+                Get Started Free
               </Link>
             </div>
 
-            {/* Family Pro Plan */}
-            <div className="relative rounded-2xl border-2 border-primary bg-white p-8 shadow-elevation-3">
+            {/* Family Plan - Recommended */}
+            <div className="relative flex flex-col rounded-2xl border-2 border-primary bg-white p-8 shadow-elevation-3 md:order-2">
               {/* Recommended badge */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary px-4 py-1 text-sm font-semibold text-white">
@@ -364,23 +368,21 @@ export default function HomePage() {
               </div>
 
               <div className="text-center">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Family Pro
-                </h3>
+                <h3 className="text-xl font-semibold text-gray-900">Family</h3>
                 <div className="mt-4">
-                  <span className="text-5xl font-bold text-gray-900">$9.99</span>
+                  <span className="text-5xl font-bold text-gray-900">$7.99</span>
                   <span className="text-gray-500">/month</span>
                 </div>
                 <p className="mt-2 text-sm text-gray-500">
-                  Everything your family needs
+                  Everything for growing families
                 </p>
               </div>
 
-              <ul className="mt-8 space-y-4">
+              <ul className="mt-8 flex-1 space-y-4">
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
                   <span className="text-gray-700">
-                    <strong>Unlimited</strong> child accounts
+                    <strong>Up to 5</strong> kids
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
@@ -391,7 +393,7 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
-                  <span className="text-gray-700">Real debit cards for each child</span>
+                  <span className="text-gray-700">Debit cards included, free shipping</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
@@ -407,17 +409,66 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon size={20} className="mt-0.5 shrink-0" />
-                  <span className="text-gray-700">Investment simulation</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
                   <span className="text-gray-700">Advanced chore marketplace</span>
                 </li>
               </ul>
 
               <Link
-                href="/sign-up?plan=pro"
+                href="/sign-up?plan=family"
                 className="mt-8 block w-full rounded-lg bg-primary py-3 text-center font-semibold text-white transition-colors hover:bg-primary-600"
+              >
+                Start 14-Day Free Trial
+              </Link>
+            </div>
+
+            {/* Family+ Plan */}
+            <div className="relative flex flex-col rounded-2xl border-2 border-gray-200 bg-white p-8 md:order-3">
+              {/* Best Value badge */}
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-1 text-sm font-semibold text-white">
+                  Best Value
+                </span>
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-xl font-semibold text-gray-900">Family+</h3>
+                <div className="mt-4">
+                  <span className="text-5xl font-bold text-gray-900">$12.99</span>
+                  <span className="text-gray-500">/month</span>
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Premium features for large families
+                </p>
+              </div>
+
+              <ul className="mt-8 flex-1 space-y-4">
+                <li className="flex items-start gap-3">
+                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
+                  <span className="text-gray-700">
+                    <strong>Unlimited</strong> kids
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
+                  <span className="text-gray-700">Everything in Family</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
+                  <span className="text-gray-700">Investment simulation</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
+                  <span className="text-gray-700">Premium card designs</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon size={20} className="mt-0.5 shrink-0" />
+                  <span className="text-gray-700">Priority support</span>
+                </li>
+              </ul>
+
+              <Link
+                href="/sign-up?plan=familyplus"
+                className="mt-8 block w-full rounded-lg border-2 border-secondary bg-secondary py-3 text-center font-semibold text-white transition-colors hover:bg-secondary-600"
               >
                 Start 14-Day Free Trial
               </Link>
@@ -427,7 +478,7 @@ export default function HomePage() {
           {/* Trust badges */}
           <div className="mt-12 flex flex-col items-center gap-4 text-center">
             <p className="text-sm text-gray-500">
-              14-day free trial on Family Pro. Cancel anytime.
+              14-day free trial on paid plans. Cancel anytime.
             </p>
             <div className="flex flex-wrap justify-center gap-6 text-xs text-gray-400">
               <span className="flex items-center gap-1">
