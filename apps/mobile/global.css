@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Foundation Design System - Mobile */
+
+@layer base {
+  /* Font family mappings for NativeWind */
+  :root {
+    --font-sans: "Outfit_400Regular";
+    --font-sans-medium: "Outfit_500Medium";
+    --font-sans-semibold: "Outfit_600SemiBold";
+    --font-sans-bold: "Outfit_700Bold";
+    --font-mono: "JetBrainsMono_400Regular";
+    --font-mono-medium: "JetBrainsMono_500Medium";
+    --font-mono-semibold: "JetBrainsMono_600SemiBold";
+    --font-mono-bold: "JetBrainsMono_700Bold";
+  }
+}
+
+@layer utilities {
+  /* Money display utility classes */
+  .font-money {
+    font-family: "JetBrainsMono_600SemiBold";
+  }
+
+  .font-money-bold {
+    font-family: "JetBrainsMono_700Bold";
+  }
+
+  /* Text utilities with proper font weights */
+  .text-display {
+    font-family: "Outfit_700Bold";
+    font-size: 40px;
+    line-height: 48px;
+  }
+
+  .text-h1 {
+    font-family: "Outfit_700Bold";
+    font-size: 32px;
+    line-height: 40px;
+  }
+
+  .text-h2 {
+    font-family: "Outfit_600SemiBold";
+    font-size: 24px;
+    line-height: 32px;
+  }
+
+  .text-h3 {
+    font-family: "Outfit_600SemiBold";
+    font-size: 20px;
+    line-height: 28px;
+  }
+
+  .text-body-lg {
+    font-family: "Outfit_400Regular";
+    font-size: 18px;
+    line-height: 28px;
+  }
+
+  .text-body {
+    font-family: "Outfit_400Regular";
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .text-body-sm {
+    font-family: "Outfit_400Regular";
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .text-caption {
+    font-family: "Outfit_500Medium";
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .text-overline {
+    font-family: "Outfit_600SemiBold";
+    font-size: 11px;
+    line-height: 16px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Money display sizes */
+  .text-money-lg {
+    font-family: "JetBrainsMono_600SemiBold";
+    font-size: 48px;
+    line-height: 56px;
+  }
+
+  .text-money-md {
+    font-family: "JetBrainsMono_600SemiBold";
+    font-size: 32px;
+    line-height: 40px;
+  }
+
+  .text-money-sm {
+    font-family: "JetBrainsMono_500Medium";
+    font-size: 20px;
+    line-height: 28px;
+  }
+
+  .text-trust-score {
+    font-family: "JetBrainsMono_700Bold";
+    font-size: 64px;
+    line-height: 72px;
+  }
+
+  /* Button press animation */
+  .btn-press {
+    transform: scale(0.97);
+  }
+
+  /* Card tap animation */
+  .card-tap {
+    transform: scale(1.02);
+  }
+}

@@ -1,0 +1,248 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Foundation Design System - Web */
+
+@layer base {
+  :root {
+    /* Light mode - Foundation Slate */
+    --background: #F6F7F8;
+    --foreground: #151C24;
+    --surface: #FFFFFF;
+    --surface-raised: #FFFFFF;
+    --surface-elevated: #FFFFFF;
+    --muted: #6F7E8A;
+    --border: #D8DDE2;
+    --border-subtle: #ECEEF0;
+
+    /* Primary - Groundwork Blue */
+    --primary: #3080D8;
+    --primary-hover: #2666B5;
+    --primary-active: #1E4F8E;
+    --primary-foreground: #FFFFFF;
+
+    /* Secondary - Growth Green */
+    --secondary: #22C772;
+    --secondary-foreground: #FFFFFF;
+
+    /* Accent - Amber Reward */
+    --accent: #F59315;
+    --accent-foreground: #FFFFFF;
+  }
+
+  .dark {
+    /* Dark mode - Foundation Slate */
+    --background: #0C1117;
+    --foreground: #F6F7F8;
+    --surface: #151C24;
+    --surface-raised: #232D38;
+    --surface-elevated: #2D3A48;
+    --muted: #94A0AB;
+    --border: rgba(56, 68, 82, 0.5);
+    --border-subtle: rgba(56, 68, 82, 0.3);
+
+    /* Primary colors lightened for dark mode */
+    --primary: #5A9DE4;
+    --primary-hover: #89BAED;
+    --primary-active: #3080D8;
+    --primary-foreground: #0C1117;
+
+    /* Secondary colors adjusted */
+    --secondary: #4DD98F;
+    --secondary-foreground: #0C1117;
+
+    /* Accent colors adjusted */
+    --accent: #F7AC47;
+    --accent-foreground: #0C1117;
+  }
+
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  body {
+    color: var(--foreground);
+    background: var(--background);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Button variants */
+  .btn-primary {
+    @apply h-12 px-6 rounded-lg bg-primary text-white font-semibold;
+    @apply hover:bg-primary-600 active:scale-[0.97] active:bg-primary-700;
+    @apply transition-all duration-100 ease-out;
+  }
+
+  .btn-secondary {
+    @apply h-12 px-6 rounded-lg bg-slate-100 text-slate-900 font-semibold;
+    @apply hover:bg-slate-200 active:scale-[0.97] active:bg-slate-300;
+    @apply transition-all duration-100 ease-out;
+    @apply dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700;
+  }
+
+  .btn-outline {
+    @apply h-12 px-6 rounded-lg border-2 border-primary text-primary font-semibold;
+    @apply hover:bg-primary-50 active:scale-[0.97] active:bg-primary-100;
+    @apply transition-all duration-100 ease-out;
+    @apply dark:hover:bg-primary-950 dark:active:bg-primary-900;
+  }
+
+  .btn-ghost {
+    @apply h-12 px-6 rounded-lg text-slate-600 font-semibold;
+    @apply hover:bg-slate-100 active:scale-[0.97] active:bg-slate-200;
+    @apply transition-all duration-100 ease-out;
+    @apply dark:text-slate-400 dark:hover:bg-slate-800 dark:active:bg-slate-700;
+  }
+
+  /* Card variants */
+  .card {
+    @apply bg-surface rounded-lg p-5 shadow-elevation-2;
+    @apply border border-slate-100 dark:border-slate-800;
+  }
+
+  .card-elevated {
+    @apply bg-surface rounded-xl p-5 shadow-elevation-3;
+  }
+
+  .card-interactive {
+    @apply card cursor-pointer;
+    @apply hover:scale-[1.02] hover:shadow-elevation-3;
+    @apply active:scale-[0.98];
+    @apply transition-all duration-150 ease-out;
+  }
+
+  /* Bucket cards */
+  .bucket-card {
+    @apply p-5 rounded-xl border;
+  }
+
+  .bucket-card-spend {
+    @apply bg-bucket-spend-50 border-bucket-spend-200;
+  }
+
+  .bucket-card-save {
+    @apply bg-bucket-save-50 border-bucket-save-200;
+  }
+
+  .bucket-card-give {
+    @apply bg-bucket-give-50 border-bucket-give-200;
+  }
+
+  .bucket-card-invest {
+    @apply bg-bucket-invest-50 border-bucket-invest-200;
+  }
+}
+
+@layer utilities {
+  /* Money display */
+  .font-money {
+    @apply font-mono font-semibold tabular-nums;
+  }
+
+  /* Trust score tier colors */
+  .trust-excellent {
+    @apply text-trust-excellent;
+  }
+
+  .trust-strong {
+    @apply text-trust-strong;
+  }
+
+  .trust-growing {
+    @apply text-trust-growing;
+  }
+
+  .trust-building {
+    @apply text-trust-building;
+  }
+
+  /* Text styles */
+  .text-display {
+    @apply text-[40px] leading-[48px] font-bold;
+  }
+
+  .text-h1 {
+    @apply text-[32px] leading-[40px] font-bold;
+  }
+
+  .text-h2 {
+    @apply text-[24px] leading-[32px] font-semibold;
+  }
+
+  .text-h3 {
+    @apply text-[20px] leading-[28px] font-semibold;
+  }
+
+  .text-body-lg {
+    @apply text-[18px] leading-[28px] font-normal;
+  }
+
+  .text-body {
+    @apply text-[16px] leading-[24px] font-normal;
+  }
+
+  .text-body-sm {
+    @apply text-[14px] leading-[20px] font-normal;
+  }
+
+  .text-caption {
+    @apply text-[12px] leading-[16px] font-medium;
+  }
+
+  .text-overline {
+    @apply text-[11px] leading-[16px] font-semibold tracking-wide uppercase;
+  }
+
+  /* Money display sizes */
+  .text-money-lg {
+    @apply font-mono text-[48px] leading-[56px] font-semibold tabular-nums;
+  }
+
+  .text-money-md {
+    @apply font-mono text-[32px] leading-[40px] font-semibold tabular-nums;
+  }
+
+  .text-money-sm {
+    @apply font-mono text-[20px] leading-[28px] font-medium tabular-nums;
+  }
+
+  .text-trust-score {
+    @apply font-mono text-[64px] leading-[72px] font-bold tabular-nums;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
