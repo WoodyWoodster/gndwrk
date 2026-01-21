@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   title: "Gndwrk - Family Banking for Financial Literacy",
   description:
     "Teach your kids financial literacy through real banking experience. Four-bucket system, Trust Score, and AI coaching.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
