@@ -190,6 +190,98 @@ export const setSpendingLimits = mutation({
   },
 });
 
+// Send money to another family member
+export const sendToFamilyMember = mutation({
+  args: {
+    fromAccountId: v.id("accounts"),
+    toUserId: v.id("users"),
+    amount: v.number(), // In dollars
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { fromAccountId, toUserId, amount, note }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const fromAccount = await ctx.db.get(fromAccountId);
+    if (!fromAccount || fromAccount.userId !== user._id) {
+      throw new Error("Account not found or not authorized");
+    }
+
+    // Verify recipient is in the same family
+    const toUser = await ctx.db.get(toUserId);
+    if (!toUser || toUser.familyId !== user.familyId) {
+      throw new Error("Recipient not found in your family");
+    }
+
+    // Get recipient's spend account
+    const toAccount = await ctx.db
+      .query("accounts")
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", toUserId).eq("type", "spend")
+      )
+      .unique();
+
+    if (!toAccount) {
+      throw new Error("Recipient's account not found");
+    }
+
+    const amountCents = Math.round(amount * 100);
+
+    if (fromAccount.balance < amountCents) {
+      throw new Error("Insufficient funds");
+    }
+
+    const now = Date.now();
+    const description = note
+      ? `Sent to ${toUser.firstName}: ${note}`
+      : `Sent to ${toUser.firstName}`;
+    const receiveDescription = note
+      ? `Received from ${user.firstName}: ${note}`
+      : `Received from ${user.firstName}`;
+
+    // Update balances and create transactions in parallel
+    await Promise.all([
+      ctx.db.patch(fromAccountId, {
+        balance: fromAccount.balance - amountCents,
+      }),
+      ctx.db.patch(toAccount._id, {
+        balance: toAccount.balance + amountCents,
+      }),
+      ctx.db.insert("transactions", {
+        userId: user._id,
+        accountId: fromAccountId,
+        familyId: fromAccount.familyId,
+        amount: -amountCents,
+        type: "debit",
+        category: "Transfer",
+        description,
+        status: "completed",
+        createdAt: now,
+      }),
+      ctx.db.insert("transactions", {
+        userId: toUserId,
+        accountId: toAccount._id,
+        familyId: toAccount.familyId,
+        amount: amountCents,
+        type: "credit",
+        category: "Transfer",
+        description: receiveDescription,
+        status: "completed",
+        createdAt: now,
+      }),
+    ]);
+
+    return { success: true };
+  },
+});
+
 // Create accounts for a new user
 export const createForUser = mutation({
   args: {
