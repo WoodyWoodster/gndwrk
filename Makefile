@@ -31,11 +31,11 @@ tunnels:
 	@echo "Starting tunnels..."
 	@mkdir -p .dev-pids
 	@# Kill existing if running
-	@-pkill -f "ngrok http 3000" 2>/dev/null || true
+	@-pkill -f "ngrok http" 2>/dev/null || true
 	@-pkill -f "stripe listen" 2>/dev/null || true
 	@sleep 1
 	@# Start ngrok
-	@ngrok http 3000 > /tmp/gndwrk-ngrok.log 2>&1 & echo $$! > .dev-pids/ngrok.pid
+	@ngrok http --domain=open-hen-infinitely.ngrok-free.app 3000 > /tmp/gndwrk-ngrok.log 2>&1 & echo $$! > .dev-pids/ngrok.pid
 	@sleep 2
 	@# Start stripe listen
 	@stripe listen --forward-to localhost:3000/api/webhooks/stripe > /tmp/gndwrk-stripe.log 2>&1 & echo $$! > .dev-pids/stripe.pid
@@ -56,7 +56,7 @@ convex:
 # Stop all background services
 stop:
 	@echo "Stopping services..."
-	@-pkill -f "ngrok http 3000" 2>/dev/null || true
+	@-pkill -f "ngrok http" 2>/dev/null || true
 	@-pkill -f "stripe listen" 2>/dev/null || true
 	@-pkill -f "convex dev" 2>/dev/null || true
 	@rm -rf .dev-pids
@@ -85,7 +85,7 @@ clean: stop
 # Show status of services
 status:
 	@echo "=== Service Status ==="
-	@echo -n "ngrok:  " && (pgrep -f "ngrok http 3000" > /dev/null && echo "running" || echo "stopped")
+	@echo -n "ngrok:  " && (pgrep -f "ngrok http" > /dev/null && echo "running" || echo "stopped")
 	@echo -n "stripe: " && (pgrep -f "stripe listen" > /dev/null && echo "running" || echo "stopped")
 	@echo -n "convex: " && (pgrep -f "convex dev" > /dev/null && echo "running" || echo "stopped")
 	@echo ""

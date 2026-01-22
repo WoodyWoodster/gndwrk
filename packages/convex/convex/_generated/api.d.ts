@@ -13,6 +13,7 @@ import type * as ai from "../ai.js";
 import type * as chores from "../chores.js";
 import type * as families from "../families.js";
 import type * as loans from "../loans.js";
+import type * as onboarding from "../onboarding.js";
 import type * as savingsGoals from "../savingsGoals.js";
 import type * as stripe from "../stripe.js";
 import type * as transactions from "../transactions.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   chores: typeof chores;
   families: typeof families;
   loans: typeof loans;
+  onboarding: typeof onboarding;
   savingsGoals: typeof savingsGoals;
   stripe: typeof stripe;
   transactions: typeof transactions;

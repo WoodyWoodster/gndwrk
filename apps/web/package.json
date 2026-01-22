@@ -14,6 +14,7 @@
     "@clerk/nextjs": "^6.10.0",
     "@gndwrk/types": "workspace:*",
     "ai": "^6.0.44",
+    "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "convex": "^1.21.0",
     "convex-ents": "^0.12.0",
@@ -25,6 +26,7 @@
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

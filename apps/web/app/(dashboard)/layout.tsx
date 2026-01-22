@@ -10,6 +10,7 @@ import {
   LoanIcon,
   TrustScoreIcon,
 } from "@/components/icons";
+import { OnboardingCheck } from "@/components/onboarding-check";
 
 export default async function DashboardLayout({
   children,
@@ -98,7 +99,9 @@ export default async function DashboardLayout({
 
       {/* Main content */}
       <main className="ml-64">
-        <div className="p-8">{children}</div>
+        <OnboardingCheck>
+          <div className="p-8">{children}</div>
+        </OnboardingCheck>
       </main>
     </div>
   );

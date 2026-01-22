@@ -161,3 +161,72 @@ export const deleteFromClerk = mutation({
     }
   },
 });
+
+// Create a kid profile by parent (managed account)
+export const createKidByParent = mutation({
+  args: {
+    firstName: v.string(),
+    lastName: v.optional(v.string()),
+    dateOfBirth: v.optional(v.number()),
+  },
+  handler: async (ctx, { firstName, lastName, dateOfBirth }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const parent = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!parent) throw new Error("User not found");
+    if (parent.role !== "parent") throw new Error("Only parents can create kid profiles");
+    if (!parent.familyId) throw new Error("Parent must have a family");
+
+    // Generate a unique managed clerk ID
+    const managedClerkId = `managed_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    // Create the kid user
+    const kidId = await ctx.db.insert("users", {
+      clerkId: managedClerkId,
+      email: `${managedClerkId}@managed.gndwrk.com`,
+      firstName,
+      lastName: lastName ?? "",
+      role: "kid",
+      familyId: parent.familyId,
+      dateOfBirth,
+      createdByParent: true,
+      choresCompleted: 0,
+      savingStreak: 0,
+      loansRepaid: 0,
+    });
+
+    // Create the 4 bucket accounts for the kid
+    const bucketTypes = ["spend", "save", "give", "invest"] as const;
+    for (const type of bucketTypes) {
+      await ctx.db.insert("accounts", {
+        userId: kidId,
+        familyId: parent.familyId,
+        type,
+        balance: 0,
+      });
+    }
+
+    // Create initial trust score
+    await ctx.db.insert("trustScores", {
+      userId: kidId,
+      score: 500,
+      factors: {
+        loanRepayment: 50,
+        savingsConsistency: 50,
+        choreCompletion: 50,
+        budgetAdherence: 50,
+        givingBehavior: 50,
+        accountAge: 0,
+        parentEndorsements: 50,
+      },
+      calculatedAt: Date.now(),
+    });
+
+    return kidId;
+  },
+});

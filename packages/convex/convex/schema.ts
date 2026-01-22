@@ -44,6 +44,24 @@ export default defineSchema({
     choresCompleted: v.optional(v.number()),
     savingStreak: v.optional(v.number()),
     loansRepaid: v.optional(v.number()),
+    // Kid management
+    createdByParent: v.optional(v.boolean()), // True if parent created this kid profile
+    // Onboarding fields
+    stripeIdentitySessionId: v.optional(v.string()),
+    stripeTreasuryAccountId: v.optional(v.string()),
+    stripeCardholderId: v.optional(v.string()),
+    stripeIssuingCardId: v.optional(v.string()),
+    onboardingStep: v.optional(
+      v.union(
+        v.literal("role_select"),
+        v.literal("family_create"),
+        v.literal("kyc_verify"),
+        v.literal("treasury_setup"),
+        v.literal("card_setup"),
+        v.literal("complete")
+      )
+    ),
+    onboardingCompletedAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
