@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { Ionicons } from "@expo/vector-icons";
-import { Link } from "expo-router";
-import { BucketCard, TrustScoreBadge } from "@gndwrk/ui";
+import { Link, useRouter } from "expo-router";
+import { BucketCard, TrustScoreBadge, DashboardSkeleton, KidFriendlyEmptyState } from "@gndwrk/ui";
+import { haptics } from "@/lib/haptics";
 
 type BucketType = "spend" | "save" | "give" | "invest";
 
@@ -119,8 +120,10 @@ function SendMoneyModal({
         });
       }
       setStep("success");
+      haptics.moneyTransfer();
     } catch (e: any) {
       setError(e.message || "Transfer failed");
+      haptics.error();
     } finally {
       setLoading(false);
     }
@@ -535,16 +538,36 @@ function TransactionItem({
 
 export default function KidDashboard() {
   const [showSendModal, setShowSendModal] = useState(false);
+  const router = useRouter();
   const { user } = useUser();
   const currentUser = useQuery(api.users.getCurrentUser);
   const family = useQuery(api.families.getMyFamily);
   const accounts = useQuery(api.accounts.getMyAccounts);
   const transactions = useQuery(api.transactions.getRecent, { limit: 5 });
   const trustScore = useQuery(api.trustScore.getMyCurrent);
+  const hasTutorialCompleted = useQuery(api.users.hasTutorialCompleted);
   const familyKids = useQuery(
     api.users.getFamilyKids,
     family ? { familyId: family._id } : "skip"
   );
+
+  // Redirect to tutorial if not completed
+  useEffect(() => {
+    if (hasTutorialCompleted === false) {
+      router.replace("/(kid)/tutorial");
+    }
+  }, [hasTutorialCompleted, router]);
+
+  // Show loading while checking tutorial status or loading data
+  const isLoading = hasTutorialCompleted === undefined || accounts === undefined;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50">
+        <DashboardSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   const totalBalance =
     accounts?.reduce((sum, acc) => sum + acc.balance, 0) ?? 0;
@@ -700,9 +723,12 @@ export default function KidDashboard() {
               </View>
             ))}
             {!transactions?.length && (
-              <Text className="text-body py-6 text-center text-slate-500">
-                No transactions yet
-              </Text>
+              <KidFriendlyEmptyState
+                variant="transactions"
+                emoji="🧾"
+                title="No transactions yet"
+                description="When you earn or spend money, it will show up here!"
+              />
             )}
           </View>
         </View>

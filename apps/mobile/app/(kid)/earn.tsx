@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { Ionicons } from "@expo/vector-icons";
+import { KidFriendlyEmptyState } from "@gndwrk/ui";
 
 type ChoreStatus = "open" | "claimed" | "pending_approval" | "completed" | "paid";
 
@@ -182,14 +183,13 @@ export default function EarnScreen() {
             />
           ))}
           {availableChores.length === 0 && (
-            <View className="items-center rounded-xl bg-surface p-8">
-              <Ionicons name="checkbox" size={48} color="#D1D5DB" />
-              <Text className="mt-3 text-center font-medium text-text-muted">
-                No chores available right now
-              </Text>
-              <Text className="mt-1 text-center text-sm text-text-muted">
-                Check back later or ask your parent to add some!
-              </Text>
+            <View className="rounded-xl bg-surface">
+              <KidFriendlyEmptyState
+                variant="chores"
+                emoji="✨"
+                title="No chores available"
+                description="Ask your parents to create some chores for you to earn money!"
+              />
             </View>
           )}
         </View>

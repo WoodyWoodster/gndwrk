@@ -419,6 +419,49 @@ export default defineSchema({
     previousAmount: v.number(),
     newAmount: v.number(),
     createdAt: v.number(),
+  }).index("by_goal", ["goalId"]),
+
+  // ============================================
+  // GAMIFICATION TABLES
+  // ============================================
+
+  // Tutorial completion tracking
+  tutorialProgress: defineTable({
+    userId: v.id("users"),
+    tutorialType: v.union(v.literal("kid_onboarding"), v.literal("parent_onboarding")),
+    completedAt: v.optional(v.number()),
+    skippedAt: v.optional(v.number()),
+    currentStep: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   })
-    .index("by_goal", ["goalId"]),
+    .index("by_user", ["userId"])
+    .index("by_user_type", ["userId", "tutorialType"]),
+
+  // Achievement definitions and unlocks
+  achievements: defineTable({
+    userId: v.id("users"),
+    achievementId: v.string(), // e.g., "first_save", "week_warrior", "chore_champion"
+    unlockedAt: v.number(),
+    metadata: v.optional(v.any()), // Additional context like amount saved, streak count
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_achievement", ["userId", "achievementId"]),
+
+  // Streak tracking
+  streaks: defineTable({
+    userId: v.id("users"),
+    streakType: v.union(
+      v.literal("daily_login"),
+      v.literal("savings_streak"),
+      v.literal("chore_streak")
+    ),
+    currentCount: v.number(),
+    longestCount: v.number(),
+    lastActivityAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_type", ["userId", "streakType"]),
 });

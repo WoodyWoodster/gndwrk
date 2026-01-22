@@ -9,6 +9,7 @@
  */
 
 import type * as accounts from "../accounts.js";
+import type * as achievements from "../achievements.js";
 import type * as ai from "../ai.js";
 import type * as chores from "../chores.js";
 import type * as families from "../families.js";
@@ -16,6 +17,7 @@ import type * as loans from "../loans.js";
 import type * as migrations_migrateSchema from "../migrations/migrateSchema.js";
 import type * as onboarding from "../onboarding.js";
 import type * as savingsGoals from "../savingsGoals.js";
+import type * as streaks from "../streaks.js";
 import type * as stripe from "../stripe.js";
 import type * as transactions from "../transactions.js";
 import type * as trustScore from "../trustScore.js";
@@ -30,6 +32,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
+  achievements: typeof achievements;
   ai: typeof ai;
   chores: typeof chores;
   families: typeof families;
@@ -37,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/migrateSchema": typeof migrations_migrateSchema;
   onboarding: typeof onboarding;
   savingsGoals: typeof savingsGoals;
+  streaks: typeof streaks;
   stripe: typeof stripe;
   transactions: typeof transactions;
   trustScore: typeof trustScore;

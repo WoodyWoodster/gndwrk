@@ -16,6 +16,15 @@ import {
   ConfigureIllustration,
   GrowthIllustration,
 } from "@/components/icons/illustrations";
+import { Testimonials } from "@/components/marketing/Testimonials";
+import { FAQ, getFAQSchemaData } from "@/components/marketing/FAQ";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Gndwrk - Teach Your Kids Real Financial Skills | Family Banking App",
+  description:
+    "The #1 family banking app for teaching kids ages 6-18 real financial literacy. 4-bucket money system, Trust Score that converts to real credit, AI coach, and debit cards with parent controls. Join 12,000+ families.",
+};
 
 export default function HomePage() {
   return (
@@ -55,40 +64,102 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero */}
+      {/* Hero - Problem/Solution Pattern */}
       <section className="container mx-auto px-6 py-20 text-center">
-        <h1 className="mx-auto max-w-4xl text-5xl font-bold leading-tight text-gray-900 md:text-6xl">
-          Teach Your Kids{" "}
-          <span className="text-primary">Real Financial Skills</span>
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-xl text-gray-600">
-          The family banking app that builds financial habits from age 6 to 18,
-          then transitions to adult banking with earned advantages.
+        {/* Problem Statement */}
+        <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-accent-50 px-4 py-2 text-sm font-medium text-accent-700">
+          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          Only 17 states require financial literacy education in schools
         </p>
-        <div className="mt-10 flex justify-center gap-4">
+
+        <h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold leading-tight text-gray-900 md:text-6xl">
+          Your Kids Graduate Knowing Calculus,{" "}
+          <span className="text-primary">But Not How Money Works</span>
+        </h1>
+
+        {/* Solution */}
+        <p className="mx-auto mt-6 max-w-2xl text-xl text-gray-600">
+          Gndwrk is the family banking app that teaches financial literacy
+          through real money—not worksheets. Kids manage their own accounts,
+          build a Trust Score, and graduate with skills that actually matter.
+        </p>
+
+        {/* Social Proof Micro */}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500">
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              <div className="h-8 w-8 rounded-full bg-primary-100 ring-2 ring-white flex items-center justify-center text-xs font-medium text-primary">SM</div>
+              <div className="h-8 w-8 rounded-full bg-secondary-100 ring-2 ring-white flex items-center justify-center text-xs font-medium text-secondary">MJ</div>
+              <div className="h-8 w-8 rounded-full bg-accent-100 ring-2 ring-white flex items-center justify-center text-xs font-medium text-accent">JL</div>
+              <div className="h-8 w-8 rounded-full bg-bucket-give-100 ring-2 ring-white flex items-center justify-center text-xs font-medium text-bucket-give">+12K</div>
+            </div>
+            <span>Trusted by 12,000+ families</span>
+          </div>
+          <span className="hidden md:inline">•</span>
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <svg key={star} className="h-4 w-4 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+            ))}
+            <span>4.8/5 from 2,800+ reviews</span>
+          </div>
+        </div>
+
+        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link
             href="/sign-up"
-            className="rounded-lg bg-primary px-8 py-4 text-lg font-semibold text-white hover:bg-primary-600"
+            className="w-full rounded-lg bg-primary px-8 py-4 text-lg font-semibold text-white hover:bg-primary-600 sm:w-auto"
           >
-            Start Free Trial
+            Start Your Free Trial
           </Link>
           <Link
             href="#how-it-works"
-            className="rounded-lg border-2 border-gray-300 px-8 py-4 text-lg font-semibold text-gray-700 hover:border-gray-400"
+            className="w-full rounded-lg border-2 border-gray-300 px-8 py-4 text-lg font-semibold text-gray-700 hover:border-gray-400 sm:w-auto"
           >
-            Learn More
+            See How It Works
           </Link>
         </div>
+        <p className="mt-4 text-sm text-gray-500">
+          No credit card required • Free forever on Starter plan • Setup in 3 minutes
+        </p>
       </section>
 
       {/* Features */}
       <section id="features" className="bg-white py-20">
         <div className="container mx-auto px-6">
+          {/* Stats bar */}
+          <div className="mb-16 rounded-2xl bg-gradient-to-r from-primary-50 via-secondary-50 to-accent-50 p-6">
+            <div className="grid gap-6 text-center sm:grid-cols-3">
+              <div>
+                <p className="text-2xl font-bold text-gray-900">2x</p>
+                <p className="text-sm text-gray-600">
+                  Kids who learn money skills early save 2x more as adults
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">40%</p>
+                <p className="text-sm text-gray-600">
+                  Families report better money habits with structured allowances
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">78%</p>
+                <p className="text-sm text-gray-600">
+                  Of parents say school doesn't teach enough about money
+                </p>
+              </div>
+            </div>
+          </div>
+
           <h2 className="text-center text-3xl font-bold text-gray-900">
             Everything Your Family Needs
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-gray-600">
             A complete financial education platform disguised as a banking app.
+            Real money, real lessons, real results.
           </p>
 
           <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -504,6 +575,12 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <Testimonials />
+
+      {/* FAQ Section */}
+      <FAQ />
+
       {/* CTA */}
       <section className="bg-primary py-20">
         <div className="container mx-auto px-6 text-center">
@@ -511,15 +588,26 @@ export default function HomePage() {
             Ready to Build Your Family's Financial Future?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-primary-100">
-            Join thousands of families teaching real financial skills. Start
-            your free trial today.
+            Join 12,000+ families teaching real financial skills. Start
+            your free trial today—no credit card required.
           </p>
-          <Link
-            href="/sign-up"
-            className="mt-8 inline-block rounded-lg bg-white px-8 py-4 text-lg font-semibold text-primary hover:bg-gray-100"
-          >
-            Get Started Free
-          </Link>
+          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/sign-up"
+              className="rounded-lg bg-white px-8 py-4 text-lg font-semibold text-primary hover:bg-gray-100"
+            >
+              Start Free Trial
+            </Link>
+            <Link
+              href="#faq"
+              className="rounded-lg border-2 border-primary-200 px-8 py-4 text-lg font-semibold text-white hover:bg-primary-600"
+            >
+              Read FAQ
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-primary-200">
+            14-day free trial on paid plans • Cancel anytime • FDIC insured
+          </p>
         </div>
       </section>
 

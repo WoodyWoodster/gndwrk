@@ -265,3 +265,145 @@ export const createKidByParent = mutation({
     return kidId;
   },
 });
+
+// ============================================
+// TUTORIAL FUNCTIONS
+// ============================================
+
+// Check if user has completed the tutorial
+export const hasTutorialCompleted = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return false;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) return false;
+
+    const tutorialType = user.role === "parent" ? "parent_onboarding" : "kid_onboarding";
+
+    const progress = await ctx.db
+      .query("tutorialProgress")
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", user._id).eq("tutorialType", tutorialType)
+      )
+      .unique();
+
+    return progress?.completedAt !== undefined || progress?.skippedAt !== undefined;
+  },
+});
+
+// Get tutorial progress
+export const getTutorialProgress = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) return null;
+
+    const tutorialType = user.role === "parent" ? "parent_onboarding" : "kid_onboarding";
+
+    return await ctx.db
+      .query("tutorialProgress")
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", user._id).eq("tutorialType", tutorialType)
+      )
+      .unique();
+  },
+});
+
+// Complete the tutorial
+export const completeTutorial = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const now = Date.now();
+    const tutorialType = user.role === "parent" ? "parent_onboarding" : "kid_onboarding";
+
+    // Check if progress exists
+    const existing = await ctx.db
+      .query("tutorialProgress")
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", user._id).eq("tutorialType", tutorialType)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        completedAt: now,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("tutorialProgress", {
+        userId: user._id,
+        tutorialType,
+        completedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+// Skip the tutorial
+export const skipTutorial = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const now = Date.now();
+    const tutorialType = user.role === "parent" ? "parent_onboarding" : "kid_onboarding";
+
+    // Check if progress exists
+    const existing = await ctx.db
+      .query("tutorialProgress")
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", user._id).eq("tutorialType", tutorialType)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        skippedAt: now,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("tutorialProgress", {
+        userId: user._id,
+        tutorialType,
+        skippedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});

@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { OnboardingTimeEstimate } from "@/components/OnboardingProgress";
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -65,6 +66,9 @@ export default function WelcomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Time Estimate */}
+        <OnboardingTimeEstimate />
 
         {/* CTA */}
         <TouchableOpacity
