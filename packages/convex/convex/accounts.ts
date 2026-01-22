@@ -20,11 +20,10 @@ export const getMyAccounts = query({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    // Convert balance from cents to dollars and include goals
+    // Convert balance from cents to dollars
     return accounts.map((acc) => ({
       ...acc,
       balance: acc.balance / 100,
-      goal: acc.goal ? acc.goal / 100 : undefined,
     }));
   },
 });
@@ -41,7 +40,6 @@ export const getByUserId = query({
     return accounts.map((acc) => ({
       ...acc,
       balance: acc.balance / 100,
-      goal: acc.goal ? acc.goal / 100 : undefined,
     }));
   },
 });
@@ -122,14 +120,15 @@ export const transfer = mutation({
   },
 });
 
-// Set savings goal
+// Set savings goal - creates a new savings goal in the savingsGoals table
 export const setGoal = mutation({
   args: {
     accountId: v.id("accounts"),
     goal: v.number(), // In dollars
     goalName: v.string(),
+    deadline: v.optional(v.number()),
   },
-  handler: async (ctx, { accountId, goal, goalName }) => {
+  handler: async (ctx, { accountId, goal, goalName, deadline }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
@@ -145,12 +144,22 @@ export const setGoal = mutation({
       throw new Error("Account not found or not authorized");
     }
 
-    await ctx.db.patch(accountId, {
-      goal: Math.round(goal * 100),
-      goalName,
+    const now = Date.now();
+
+    // Create a savings goal record
+    const goalId = await ctx.db.insert("savingsGoals", {
+      userId: user._id,
+      accountId,
+      name: goalName,
+      targetAmount: Math.round(goal * 100),
+      currentAmount: 0,
+      deadline,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
     });
 
-    return { success: true };
+    return { success: true, goalId };
   },
 });
 

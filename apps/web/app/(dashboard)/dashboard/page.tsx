@@ -146,11 +146,11 @@ export default function DashboardPage() {
     family ? { familyId: family._id } : "skip"
   );
 
-  const totalBalance =
-    kids?.reduce(
-      (sum: number, k: { totalBalance: number }) => sum + k.totalBalance,
-      0
-    ) ?? 0;
+  const validKids = kids?.filter((k): k is NonNullable<typeof k> => k !== null) ?? [];
+  const totalBalance = validKids.reduce(
+    (sum: number, k) => sum + k.totalBalance,
+    0
+  );
   const totalOutstanding =
     activeLoans?.reduce(
       (sum: number, l: { remainingBalance: number }) => sum + l.remainingBalance,
@@ -178,7 +178,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Active Kids"
-          value={String(kids?.length ?? 0)}
+          value={String(validKids.length)}
           gradient="bg-gradient-to-br from-primary-100 to-secondary-100"
           icon={<FamilyIcon size={28} />}
         />
@@ -234,9 +234,9 @@ export default function DashboardPage() {
           </a>
         </div>
 
-        {kids && kids.length > 0 ? (
+        {validKids.length > 0 ? (
           <div className="grid gap-6 lg:grid-cols-2">
-            {kids.map((kid) => (
+            {validKids.map((kid) => (
               <KidOverviewCard key={kid.id} kid={kid} />
             ))}
           </div>

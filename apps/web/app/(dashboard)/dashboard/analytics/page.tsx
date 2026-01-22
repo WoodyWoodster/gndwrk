@@ -162,11 +162,12 @@ export default function AnalyticsPage() {
     family ? { familyId: family._id, limit: 50 } : "skip"
   );
 
+  // Filter out null kids
+  const validKids = kids?.filter((k): k is NonNullable<typeof k> => k !== null) ?? [];
+
   // Calculate totals
-  const totalBalance =
-    kids?.reduce((sum, k) => sum + k.totalBalance, 0) ?? 0;
-  const totalSavings =
-    kids?.reduce((sum, k) => sum + k.saveBalance, 0) ?? 0;
+  const totalBalance = validKids.reduce((sum, k) => sum + k.totalBalance, 0);
+  const totalSavings = validKids.reduce((sum, k) => sum + k.saveBalance, 0);
 
   // Calculate spending from transactions (debits only)
   const now = Date.now();
@@ -318,9 +319,9 @@ export default function AnalyticsPage() {
           <h2 className="text-lg font-semibold text-gray-900">Kid Balances</h2>
           <p className="text-sm text-gray-500">Current balance breakdown</p>
 
-          {kids && kids.length > 0 ? (
+          {validKids.length > 0 ? (
             <div className="mt-6 space-y-4">
-              {kids.map((kid) => (
+              {validKids.map((kid) => (
                 <div
                   key={kid.id}
                   className="flex items-center gap-4 rounded-xl bg-gradient-to-br from-primary-50 to-secondary-50 p-4"

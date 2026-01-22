@@ -13,25 +13,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user from Convex
+    // Get user and stripe data from Convex
     const clerkToken = await auth().then((a) => a.getToken({ template: "convex" }));
     convex.setAuth(clerkToken!);
-    const user = await convex.query(api.users.getCurrentUser);
+
+    const [user, onboardingStatus] = await Promise.all([
+      convex.query(api.users.getCurrentUser),
+      convex.query(api.onboarding.getStatus),
+    ]);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Check if already has treasury account
-    if (user.stripeTreasuryAccountId) {
+    if (onboardingStatus?.stripeTreasuryAccountId) {
       return NextResponse.json({
-        financialAccountId: user.stripeTreasuryAccountId,
+        financialAccountId: onboardingStatus.stripeTreasuryAccountId,
         message: "Treasury account already exists",
       });
     }
 
     // Ensure user has a Stripe Connect account for Treasury
-    let connectAccountId = user.stripeConnectAccountId;
+    let connectAccountId = onboardingStatus?.stripeConnectAccountId;
 
     if (!connectAccountId) {
       // Create a Connect Custom account for Treasury
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
       // Store connect account ID
       await convex.mutation(api.onboarding.storeStripeIds, {
         stripeConnectAccountId: connectAccountId,
-      } as any); // The field is in users table
+      });
     }
 
     // Create Treasury Financial Account

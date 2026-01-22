@@ -149,7 +149,7 @@ export default function ParentDashboard() {
             </Link>
           </View>
 
-          {kids?.map((kid) => (
+          {kids?.filter((k): k is NonNullable<typeof k> => k !== null).map((kid) => (
             <KidCard key={kid.id} kid={kid} />
           ))}
 

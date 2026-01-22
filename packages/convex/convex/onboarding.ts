@@ -25,18 +25,40 @@ export const getStatus = query({
 
     if (!user) return null;
 
+    // Get onboarding session
+    const onboardingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    // Get stripe identity
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    // Get KYC verification
+    const kycVerification = await ctx.db
+      .query("kycVerifications")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .first();
+
+    const currentStep = onboardingSession?.currentStep ?? "role_select";
+    const isComplete = onboardingSession?.status === "completed";
+
     return {
       userId: user._id,
       role: user.role,
       familyId: user.familyId,
-      onboardingStep: user.onboardingStep ?? "role_select",
-      isComplete: user.onboardingStep === "complete",
-      stripeCustomerId: user.stripeCustomerId,
-      stripeConnectAccountId: user.stripeConnectAccountId,
-      stripeIdentitySessionId: user.stripeIdentitySessionId,
-      stripeTreasuryAccountId: user.stripeTreasuryAccountId,
-      stripeCardholderId: user.stripeCardholderId,
-      kycStatus: user.kycStatus,
+      onboardingStep: currentStep,
+      isComplete,
+      stripeCustomerId: stripeIdentity?.stripeCustomerId,
+      stripeConnectAccountId: stripeIdentity?.stripeConnectAccountId,
+      stripeIdentitySessionId: kycVerification?.stripeIdentitySessionId,
+      stripeTreasuryAccountId: stripeIdentity?.stripeTreasuryAccountId,
+      stripeCardholderId: stripeIdentity?.stripeCardholderId,
+      kycStatus: kycVerification?.status,
     };
   },
 });
@@ -57,15 +79,37 @@ export const updateStep = mutation({
 
     if (!user) throw new Error("User not found");
 
-    const updates: Record<string, unknown> = {
-      onboardingStep: step,
-    };
+    const now = Date.now();
 
-    if (step === "complete") {
-      updates.onboardingCompletedAt = Date.now();
+    // Find existing session or create one
+    const existingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (existingSession) {
+      const updates: Record<string, unknown> = {
+        currentStep: step,
+        updatedAt: now,
+      };
+
+      if (step === "complete") {
+        updates.status = "completed";
+        updates.completedAt = now;
+      }
+
+      await ctx.db.patch(existingSession._id, updates);
+    } else {
+      await ctx.db.insert("onboardingSessions", {
+        userId: user._id,
+        currentStep: step,
+        status: step === "complete" ? "completed" : "in_progress",
+        startedAt: now,
+        completedAt: step === "complete" ? now : undefined,
+        updatedAt: now,
+      });
     }
 
-    await ctx.db.patch(user._id, updates);
     return user._id;
   },
 });
@@ -82,6 +126,7 @@ export const storeStripeIds = mutation({
     kycStatus: v.optional(
       v.union(
         v.literal("pending"),
+        v.literal("processing"),
         v.literal("verified"),
         v.literal("failed")
       )
@@ -98,11 +143,64 @@ export const storeStripeIds = mutation({
 
     if (!user) throw new Error("User not found");
 
-    const updates = Object.fromEntries(
-      Object.entries(args).filter(([_, v]) => v !== undefined)
-    );
+    const now = Date.now();
 
-    await ctx.db.patch(user._id, updates);
+    // Update stripeIdentities table
+    const existingStripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    const stripeUpdates: Record<string, unknown> = {};
+    if (args.stripeCustomerId) stripeUpdates.stripeCustomerId = args.stripeCustomerId;
+    if (args.stripeConnectAccountId) stripeUpdates.stripeConnectAccountId = args.stripeConnectAccountId;
+    if (args.stripeTreasuryAccountId) stripeUpdates.stripeTreasuryAccountId = args.stripeTreasuryAccountId;
+    if (args.stripeCardholderId) stripeUpdates.stripeCardholderId = args.stripeCardholderId;
+    if (args.stripeIssuingCardId) stripeUpdates.stripeIssuingCardId = args.stripeIssuingCardId;
+
+    if (Object.keys(stripeUpdates).length > 0) {
+      if (existingStripeIdentity) {
+        await ctx.db.patch(existingStripeIdentity._id, {
+          ...stripeUpdates,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("stripeIdentities", {
+          userId: user._id,
+          ...stripeUpdates,
+          createdAt: now,
+          updatedAt: now,
+        } as any);
+      }
+    }
+
+    // Update kycVerifications table if identity session provided
+    if (args.stripeIdentitySessionId) {
+      const existingKyc = await ctx.db
+        .query("kycVerifications")
+        .withIndex("by_session", (q) =>
+          q.eq("stripeIdentitySessionId", args.stripeIdentitySessionId!)
+        )
+        .unique();
+
+      if (existingKyc) {
+        if (args.kycStatus) {
+          await ctx.db.patch(existingKyc._id, {
+            status: args.kycStatus,
+            updatedAt: now,
+          });
+        }
+      } else {
+        await ctx.db.insert("kycVerifications", {
+          userId: user._id,
+          stripeIdentitySessionId: args.stripeIdentitySessionId,
+          status: args.kycStatus ?? "pending",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+
     return user._id;
   },
 });
@@ -122,6 +220,8 @@ export const complete = mutation({
     if (!user) throw new Error("User not found");
     if (!user.familyId) throw new Error("User must have a family");
 
+    const now = Date.now();
+
     // Check if accounts already exist
     const existingAccounts = await ctx.db
       .query("accounts")
@@ -137,15 +237,57 @@ export const complete = mutation({
           familyId: user.familyId,
           type,
           balance: 0,
+          createdAt: now,
+          updatedAt: now,
         });
       }
     }
 
     // Mark onboarding as complete
-    await ctx.db.patch(user._id, {
-      onboardingStep: "complete",
-      onboardingCompletedAt: Date.now(),
-    });
+    const existingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.patch(existingSession._id, {
+        currentStep: "complete",
+        status: "completed",
+        completedAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("onboardingSessions", {
+        userId: user._id,
+        currentStep: "complete",
+        status: "completed",
+        startedAt: now,
+        completedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Also create familyMember record if it doesn't exist
+    const existingMember = await ctx.db
+      .query("familyMembers")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (!existingMember) {
+      // Check if user is family owner
+      const family = await ctx.db.get(user.familyId);
+      const isOwner = family?.ownerId === user._id;
+
+      await ctx.db.insert("familyMembers", {
+        familyId: user.familyId,
+        userId: user._id,
+        role: isOwner ? "owner" : user.role === "parent" ? "parent" : "kid",
+        status: "active",
+        joinedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     return user._id;
   },

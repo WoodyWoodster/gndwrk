@@ -465,10 +465,11 @@ function AllocationSettingsCard({
 export default function FamilyPage() {
   const [isAddKidModalOpen, setIsAddKidModalOpen] = useState(false);
   const family = useQuery(api.families.getMyFamily);
-  const kids = useQuery(
+  const kidsQuery = useQuery(
     api.users.getFamilyKids,
     family ? { familyId: family._id } : "skip"
   );
+  const validKids = kidsQuery?.filter((k): k is NonNullable<typeof k> => k !== null) ?? [];
   const inviteCode = useQuery(
     api.families.getInviteCode,
     family ? { familyId: family._id } : "skip"
@@ -531,13 +532,13 @@ export default function FamilyPage() {
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Kids</h2>
           <span className="text-sm text-gray-500">
-            {kids?.length ?? 0} member{kids?.length !== 1 ? "s" : ""}
+            {validKids.length} member{validKids.length !== 1 ? "s" : ""}
           </span>
         </div>
 
-        {kids && kids.length > 0 ? (
+        {validKids.length > 0 ? (
           <div className="grid gap-6 lg:grid-cols-2">
-            {kids.map((kid) => (
+            {validKids.map((kid) => (
               <KidCard key={kid.id} kid={kid} />
             ))}
           </div>

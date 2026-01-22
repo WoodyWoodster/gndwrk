@@ -13,17 +13,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user from Convex
+    // Get user and stripe data from Convex
     const clerkToken = await auth().then((a) => a.getToken({ template: "convex" }));
     convex.setAuth(clerkToken!);
-    const user = await convex.query(api.users.getCurrentUser);
+
+    const [user, onboardingStatus] = await Promise.all([
+      convex.query(api.users.getCurrentUser),
+      convex.query(api.onboarding.getStatus),
+    ]);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Ensure user has a Connect account
-    const connectAccountId = user.stripeConnectAccountId;
+    const connectAccountId = onboardingStatus?.stripeConnectAccountId;
     if (!connectAccountId) {
       return NextResponse.json(
         { error: "Treasury account required before card creation" },
@@ -32,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     // Check if already has a cardholder
-    let cardholderId = user.stripeCardholderId;
+    let cardholderId = onboardingStatus?.stripeCardholderId;
 
     if (!cardholderId) {
       // Create a cardholder

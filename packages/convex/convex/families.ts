@@ -67,12 +67,15 @@ export const create = mutation({
         .unique();
     }
 
+    const now = Date.now();
+
     // Create family
     const familyId = await ctx.db.insert("families", {
       name,
       code,
       ownerId: user._id,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       defaultAllocation: {
         spend: 50,
         save: 30,
@@ -83,6 +86,17 @@ export const create = mutation({
 
     // Update user with family ID
     await ctx.db.patch(user._id, { familyId });
+
+    // Create familyMember record for owner
+    await ctx.db.insert("familyMembers", {
+      familyId,
+      userId: user._id,
+      role: "owner",
+      status: "active",
+      joinedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     return familyId;
   },
@@ -110,8 +124,45 @@ export const join = mutation({
 
     if (!family) throw new Error("Invalid family code");
 
+    const now = Date.now();
+
     // Update user with family ID
     await ctx.db.patch(user._id, { familyId: family._id });
+
+    // Create familyMember record
+    const role = user.role === "parent" ? "parent" : "kid";
+    await ctx.db.insert("familyMembers", {
+      familyId: family._id,
+      userId: user._id,
+      role,
+      status: "active",
+      joinedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create kidProfile if this is a kid joining
+    if (user.role === "kid") {
+      await ctx.db.insert("kidProfiles", {
+        userId: user._id,
+        isManagedAccount: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Create guardianship with family owner
+      await ctx.db.insert("guardianships", {
+        familyId: family._id,
+        parentId: family.ownerId,
+        kidId: user._id,
+        canApproveLoans: true,
+        canApproveChores: true,
+        canSetSpendingLimits: true,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     // Create the 4 bucket accounts for the new member
     const bucketTypes = ["spend", "save", "give", "invest"] as const;
@@ -121,13 +172,15 @@ export const join = mutation({
         familyId: family._id,
         type,
         balance: 0,
+        createdAt: now,
+        updatedAt: now,
       });
     }
 
     // Create initial trust score
     await ctx.db.insert("trustScores", {
       userId: user._id,
-      score: 500, // Starting score
+      score: 500,
       factors: {
         loanRepayment: 50,
         savingsConsistency: 50,
@@ -137,7 +190,7 @@ export const join = mutation({
         accountAge: 0,
         parentEndorsements: 50,
       },
-      calculatedAt: Date.now(),
+      calculatedAt: now,
     });
 
     return family._id;
@@ -202,7 +255,10 @@ export const updateSettings = mutation({
       Object.entries(updates).filter(([_, v]) => v !== undefined)
     );
 
-    await ctx.db.patch(familyId, filteredUpdates);
+    await ctx.db.patch(familyId, {
+      ...filteredUpdates,
+      updatedAt: Date.now(),
+    });
     return familyId;
   },
 });

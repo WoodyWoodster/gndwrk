@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 
 // Get current user from Clerk ID
 export const getCurrentUser = query({
@@ -49,15 +48,21 @@ export const setRole = mutation({
 export const getFamilyKids = query({
   args: { familyId: v.id("families") },
   handler: async (ctx, { familyId }) => {
-    const users = await ctx.db
-      .query("users")
-      .withIndex("by_family", (q) => q.eq("familyId", familyId))
-      .filter((q) => q.eq(q.field("role"), "kid"))
+    // Get kid members from familyMembers table
+    const kidMembers = await ctx.db
+      .query("familyMembers")
+      .withIndex("by_family_role", (q) =>
+        q.eq("familyId", familyId).eq("role", "kid")
+      )
+      .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
-    // Get accounts and trust scores for each kid
+    // Get user details and accounts for each kid
     const kidsWithData = await Promise.all(
-      users.map(async (user) => {
+      kidMembers.map(async (member) => {
+        const user = await ctx.db.get(member.userId);
+        if (!user) return null;
+
         const accounts = await ctx.db
           .query("accounts")
           .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -79,14 +84,14 @@ export const getFamilyKids = query({
           lastName: user.lastName,
           imageUrl: user.imageUrl,
           trustScore: latestTrustScore?.score ?? 500,
-          totalBalance: totalBalance / 100, // Convert from cents
+          totalBalance: totalBalance / 100,
           spendBalance: (spendAccount?.balance ?? 0) / 100,
           saveBalance: (saveAccount?.balance ?? 0) / 100,
         };
       })
     );
 
-    return kidsWithData;
+    return kidsWithData.filter(Boolean);
   },
 });
 
@@ -114,9 +119,6 @@ export const createFromClerk = mutation({
       firstName: args.firstName,
       lastName: args.lastName,
       imageUrl: args.imageUrl,
-      choresCompleted: 0,
-      savingStreak: 0,
-      loansRepaid: 0,
     });
   },
 });
@@ -182,6 +184,8 @@ export const createKidByParent = mutation({
     if (parent.role !== "parent") throw new Error("Only parents can create kid profiles");
     if (!parent.familyId) throw new Error("Parent must have a family");
 
+    const now = Date.now();
+
     // Generate a unique managed clerk ID
     const managedClerkId = `managed_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -194,10 +198,39 @@ export const createKidByParent = mutation({
       role: "kid",
       familyId: parent.familyId,
       dateOfBirth,
-      createdByParent: true,
-      choresCompleted: 0,
-      savingStreak: 0,
-      loansRepaid: 0,
+    });
+
+    // Create kidProfile record
+    await ctx.db.insert("kidProfiles", {
+      userId: kidId,
+      createdByParentId: parent._id,
+      isManagedAccount: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create familyMember record
+    await ctx.db.insert("familyMembers", {
+      familyId: parent.familyId,
+      userId: kidId,
+      role: "kid",
+      status: "active",
+      joinedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create guardianship record
+    await ctx.db.insert("guardianships", {
+      familyId: parent.familyId,
+      parentId: parent._id,
+      kidId: kidId,
+      canApproveLoans: true,
+      canApproveChores: true,
+      canSetSpendingLimits: true,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
     });
 
     // Create the 4 bucket accounts for the kid
@@ -208,6 +241,8 @@ export const createKidByParent = mutation({
         familyId: parent.familyId,
         type,
         balance: 0,
+        createdAt: now,
+        updatedAt: now,
       });
     }
 
@@ -224,7 +259,7 @@ export const createKidByParent = mutation({
         accountAge: 0,
         parentEndorsements: 50,
       },
-      calculatedAt: Date.now(),
+      calculatedAt: now,
     });
 
     return kidId;

@@ -3,6 +3,10 @@ import { v } from "convex/values";
 
 export default defineSchema({
   // Users table - all users (parents, kids, young adults)
+  // Note: Stripe data moved to stripeIdentities, subscriptions moved to subscriptions table,
+  // KYC moved to kycVerifications, onboarding moved to onboardingSessions,
+  // stats computed from source tables via userStats queries,
+  // kid management moved to kidProfiles
   users: defineTable({
     clerkId: v.string(),
     email: v.string(),
@@ -12,61 +16,10 @@ export default defineSchema({
     role: v.optional(v.union(v.literal("parent"), v.literal("kid"))),
     familyId: v.optional(v.id("families")),
     dateOfBirth: v.optional(v.number()), // timestamp
-    stripeCustomerId: v.optional(v.string()),
-    stripeConnectAccountId: v.optional(v.string()),
-    kycStatus: v.optional(
-      v.union(
-        v.literal("pending"),
-        v.literal("verified"),
-        v.literal("failed")
-      )
-    ),
-    // Subscription fields
-    subscriptionTier: v.optional(
-      v.union(
-        v.literal("starter"),
-        v.literal("family"),
-        v.literal("familyplus")
-      )
-    ),
-    stripeSubscriptionId: v.optional(v.string()),
-    subscriptionStatus: v.optional(
-      v.union(
-        v.literal("active"),
-        v.literal("past_due"),
-        v.literal("canceled"),
-        v.literal("trialing"),
-        v.literal("incomplete")
-      )
-    ),
-    trialEndsAt: v.optional(v.number()), // timestamp for 14-day trial
-    // Stats for profile
-    choresCompleted: v.optional(v.number()),
-    savingStreak: v.optional(v.number()),
-    loansRepaid: v.optional(v.number()),
-    // Kid management
-    createdByParent: v.optional(v.boolean()), // True if parent created this kid profile
-    // Onboarding fields
-    stripeIdentitySessionId: v.optional(v.string()),
-    stripeTreasuryAccountId: v.optional(v.string()),
-    stripeCardholderId: v.optional(v.string()),
-    stripeIssuingCardId: v.optional(v.string()),
-    onboardingStep: v.optional(
-      v.union(
-        v.literal("role_select"),
-        v.literal("family_create"),
-        v.literal("kyc_verify"),
-        v.literal("treasury_setup"),
-        v.literal("card_setup"),
-        v.literal("complete")
-      )
-    ),
-    onboardingCompletedAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
-    .index("by_family", ["familyId"])
-    .index("by_stripe_subscription", ["stripeSubscriptionId"]),
+    .index("by_family", ["familyId"]),
 
   // Families table - family unit
   families: defineTable({
@@ -74,6 +27,7 @@ export default defineSchema({
     code: v.string(), // 6-character invite code
     ownerId: v.id("users"), // Parent who created the family
     createdAt: v.number(),
+    updatedAt: v.number(),
     // Settings
     defaultAllocation: v.optional(
       v.object({
@@ -88,6 +42,8 @@ export default defineSchema({
     .index("by_owner", ["ownerId"]),
 
   // Accounts - 4 buckets per user (Treasury financial accounts)
+  // Note: Stripe IDs moved to stripeIdentities, goals moved to savingsGoals table,
+  // spending tracking computed from transactions via userStats queries
   accounts: defineTable({
     userId: v.id("users"),
     familyId: v.id("families"),
@@ -98,24 +54,16 @@ export default defineSchema({
       v.literal("invest")
     ),
     balance: v.number(), // Cents
-    goal: v.optional(v.number()), // Savings goal amount
-    goalName: v.optional(v.string()),
-    stripeTreasuryAccountId: v.optional(v.string()),
-    stripeIssuingCardId: v.optional(v.string()), // Only for spend bucket
     // Limits
     dailySpendLimit: v.optional(v.number()),
     weeklySpendLimit: v.optional(v.number()),
     monthlySpendLimit: v.optional(v.number()),
-    // Tracking
-    dailySpent: v.optional(v.number()),
-    weeklySpent: v.optional(v.number()),
-    monthlySpent: v.optional(v.number()),
-    lastResetDate: v.optional(v.number()),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_type", ["userId", "type"])
-    .index("by_family", ["familyId"])
-    .index("by_stripe_treasury", ["stripeTreasuryAccountId"]),
+    .index("by_family", ["familyId"]),
 
   // Transactions - all money movements
   transactions: defineTable({
@@ -143,6 +91,7 @@ export default defineSchema({
       v.literal("reversed")
     ),
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_account", ["accountId"])
@@ -175,6 +124,7 @@ export default defineSchema({
     approvedAt: v.optional(v.number()),
     proofPhotoUrl: v.optional(v.string()),
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_family", ["familyId"])
     .index("by_family_status", ["familyId", "status"])
@@ -204,6 +154,7 @@ export default defineSchema({
     createdAt: v.number(),
     approvedAt: v.optional(v.number()),
     paidOffAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_family", ["familyId"])
     .index("by_borrower", ["borrowerId"])
@@ -226,6 +177,8 @@ export default defineSchema({
       v.literal("late"),
       v.literal("missed")
     ),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_loan", ["loanId"])
     .index("by_user", ["userId"])
@@ -316,6 +269,7 @@ export default defineSchema({
     ),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_account", ["accountId"])
@@ -327,4 +281,144 @@ export default defineSchema({
     eventType: v.string(), // e.g., "treasury.inbound_transfer.succeeded"
     processedAt: v.number(), // Timestamp when processed
   }).index("by_event_id", ["eventId"]),
+
+  // ============================================
+  // NEW NORMALIZED TABLES
+  // ============================================
+
+  // Stripe data consolidated in one place - single source of truth for all Stripe IDs per user
+  stripeIdentities: defineTable({
+    userId: v.id("users"),
+    stripeCustomerId: v.optional(v.string()),
+    stripeConnectAccountId: v.optional(v.string()),
+    stripeTreasuryAccountId: v.optional(v.string()),
+    stripeCardholderId: v.optional(v.string()),
+    stripeIssuingCardId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_customer_id", ["stripeCustomerId"])
+    .index("by_treasury_account", ["stripeTreasuryAccountId"]),
+
+  // Subscriptions separate from user identity
+  subscriptions: defineTable({
+    userId: v.id("users"),
+    familyId: v.id("families"),
+    stripeSubscriptionId: v.string(),
+    tier: v.union(
+      v.literal("starter"),
+      v.literal("family"),
+      v.literal("familyplus")
+    ),
+    status: v.union(
+      v.literal("active"),
+      v.literal("past_due"),
+      v.literal("canceled"),
+      v.literal("trialing"),
+      v.literal("incomplete")
+    ),
+    trialEndsAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_family", ["familyId"])
+    .index("by_stripe_subscription", ["stripeSubscriptionId"]),
+
+  // KYC verification tracking
+  kycVerifications: defineTable({
+    userId: v.id("users"),
+    stripeIdentitySessionId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("verified"),
+      v.literal("failed")
+    ),
+    failureReason: v.optional(v.string()),
+    verifiedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_session", ["stripeIdentitySessionId"]),
+
+  // Onboarding as a process, not user state
+  onboardingSessions: defineTable({
+    userId: v.id("users"),
+    currentStep: v.union(
+      v.literal("role_select"),
+      v.literal("family_create"),
+      v.literal("kyc_verify"),
+      v.literal("treasury_setup"),
+      v.literal("card_setup"),
+      v.literal("complete")
+    ),
+    status: v.union(
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("abandoned")
+    ),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
+  // Explicit family membership junction table
+  familyMembers: defineTable({
+    familyId: v.id("families"),
+    userId: v.id("users"),
+    role: v.union(v.literal("owner"), v.literal("parent"), v.literal("kid")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("invited"),
+      v.literal("removed")
+    ),
+    joinedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_family", ["familyId"])
+    .index("by_user", ["userId"])
+    .index("by_family_role", ["familyId", "role"]),
+
+  // Parent-kid relationships with permissions
+  guardianships: defineTable({
+    familyId: v.id("families"),
+    parentId: v.id("users"),
+    kidId: v.id("users"),
+    canApproveLoans: v.boolean(),
+    canApproveChores: v.boolean(),
+    canSetSpendingLimits: v.boolean(),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_parent", ["parentId"])
+    .index("by_kid", ["kidId"]),
+
+  // Kid-specific profile data
+  kidProfiles: defineTable({
+    userId: v.id("users"),
+    createdByParentId: v.optional(v.id("users")),
+    isManagedAccount: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_parent", ["createdByParentId"]),
+
+  // Savings goal progress tracking
+  savingsGoalContributions: defineTable({
+    goalId: v.id("savingsGoals"),
+    userId: v.id("users"),
+    transactionId: v.optional(v.id("transactions")),
+    amount: v.number(),
+    previousAmount: v.number(),
+    newAmount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_goal", ["goalId"]),
 });

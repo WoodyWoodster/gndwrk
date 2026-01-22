@@ -169,6 +169,7 @@ export const approve = mutation({
       remainingBalance: totalAmount,
       approvedAt: now,
       nextPaymentDate: now + 7 * 24 * 60 * 60 * 1000, // 1 week from now
+      updatedAt: now,
     });
 
     // Transfer money to kid's spend account
@@ -310,11 +311,13 @@ export const makePayment = mutation({
       await Promise.all([
         ctx.db.patch(spendAccount._id, {
           balance: spendAccount.balance - paymentAmount,
+          updatedAt: now,
         }),
         ctx.db.patch(loanId, {
           status: "paid",
           remainingBalance: 0,
           paidOffAt: now,
+          updatedAt: now,
         }),
         ctx.db.insert("trustScoreEvents", {
           userId: user._id,
@@ -323,9 +326,6 @@ export const makePayment = mutation({
           eventType: newBalance < 0 ? "loan_paid_early" : "loan_payment_on_time",
           points: newBalance < 0 ? 15 : 10,
           createdAt: now,
-        }),
-        ctx.db.patch(user._id, {
-          loansRepaid: (user.loansRepaid ?? 0) + 1,
         }),
         transactionInsert,
       ]);
@@ -343,10 +343,12 @@ export const makePayment = mutation({
       await Promise.all([
         ctx.db.patch(spendAccount._id, {
           balance: spendAccount.balance - paymentAmount,
+          updatedAt: now,
         }),
         ctx.db.patch(loanId, {
           remainingBalance: newBalance,
           nextPaymentDate: now + 7 * 24 * 60 * 60 * 1000,
+          updatedAt: now,
         }),
         ctx.db.insert("trustScoreEvents", {
           userId: user._id,

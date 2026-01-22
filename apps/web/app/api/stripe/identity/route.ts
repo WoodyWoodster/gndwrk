@@ -13,17 +13,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user from Convex to check for existing customer
+    // Get user and stripe data from Convex
     const clerkToken = await auth().then((a) => a.getToken({ template: "convex" }));
     convex.setAuth(clerkToken!);
-    const user = await convex.query(api.users.getCurrentUser);
+
+    const [user, onboardingStatus] = await Promise.all([
+      convex.query(api.users.getCurrentUser),
+      convex.query(api.onboarding.getStatus),
+    ]);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Create or retrieve Stripe Customer
-    let customerId = user.stripeCustomerId;
+    let customerId = onboardingStatus?.stripeCustomerId;
 
     if (!customerId) {
       const customer = await stripe.customers.create({

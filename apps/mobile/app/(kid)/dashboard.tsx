@@ -712,7 +712,7 @@ export default function KidDashboard() {
         visible={showSendModal}
         onClose={() => setShowSendModal(false)}
         accounts={accounts}
-        familyMembers={familyKids}
+        familyMembers={familyKids?.filter((k): k is NonNullable<typeof k> => k !== null)}
         currentUserId={currentUser?._id}
       />
     </SafeAreaView>

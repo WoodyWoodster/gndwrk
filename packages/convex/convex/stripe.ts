@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 /**
  * Amount handling note:
@@ -118,7 +119,6 @@ async function checkAndRecordEvent(
   eventId: string,
   eventType: string
 ): Promise<boolean> {
-  // Check if already processed
   const existing = await ctx.db
     .query("processedStripeEvents")
     .withIndex("by_event_id", (q: any) => q.eq("eventId", eventId))
@@ -126,17 +126,45 @@ async function checkAndRecordEvent(
 
   if (existing) {
     console.log(`Event ${eventId} already processed, skipping`);
-    return false; // Already processed
+    return false;
   }
 
-  // Record the event
   await ctx.db.insert("processedStripeEvents", {
     eventId,
     eventType,
     processedAt: Date.now(),
   });
 
-  return true; // OK to process
+  return true;
+}
+
+// Helper to find user by stripe customer ID via stripeIdentities table
+async function findUserByStripeCustomerId(ctx: any, customerId: string) {
+  const stripeIdentity = await ctx.db
+    .query("stripeIdentities")
+    .withIndex("by_customer_id", (q: any) => q.eq("stripeCustomerId", customerId))
+    .unique();
+
+  if (!stripeIdentity) return null;
+  return await ctx.db.get(stripeIdentity.userId);
+}
+
+// Helper to find stripeIdentity by card ID
+async function findStripeIdentityByCardId(ctx: any, cardId: string) {
+  const stripeIdentities = await ctx.db.query("stripeIdentities").collect();
+  return stripeIdentities.find((si: any) => si.stripeIssuingCardId === cardId);
+}
+
+// Helper to find stripeIdentity by treasury account ID
+async function findStripeIdentityByTreasuryAccount(ctx: any, treasuryAccountId: string) {
+  const stripeIdentity = await ctx.db
+    .query("stripeIdentities")
+    .withIndex("by_treasury_account", (q: any) =>
+      q.eq("stripeTreasuryAccountId", treasuryAccountId)
+    )
+    .unique();
+
+  return stripeIdentity;
 }
 
 // Check spending limit for authorization
@@ -146,10 +174,16 @@ export const checkSpendingLimit = query({
     amount: v.number(),
   },
   handler: async (ctx, { cardId, amount }) => {
-    // Find account by card ID
+    // Find user's stripeIdentity by card ID
+    const stripeIdentity = await findStripeIdentityByCardId(ctx, cardId);
+    if (!stripeIdentity) return false;
+
+    // Find spend account for this user
     const account = await ctx.db
       .query("accounts")
-      .filter((q) => q.eq(q.field("stripeIssuingCardId"), cardId))
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
+      )
       .unique();
 
     if (!account) return false;
@@ -157,21 +191,50 @@ export const checkSpendingLimit = query({
     // Check balance
     if (account.balance < amount) return false;
 
+    // Calculate time boundaries
+    const now = Date.now();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    // Get debit transactions for spending calculations
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_account", (q) => q.eq("accountId", account._id))
+      .filter((q) => q.eq(q.field("type"), "debit"))
+      .collect();
+
+    // Calculate spending for each period
+    let dailySpent = 0;
+    let weeklySpent = 0;
+    let monthlySpent = 0;
+
+    for (const t of transactions) {
+      const txAmount = Math.abs(t.amount);
+      if (t.createdAt >= startOfDay.getTime()) dailySpent += txAmount;
+      if (t.createdAt >= startOfWeek.getTime()) weeklySpent += txAmount;
+      if (t.createdAt >= startOfMonth.getTime()) monthlySpent += txAmount;
+    }
+
     // Check daily limit
     if (account.dailySpendLimit) {
-      const dailySpent = account.dailySpent ?? 0;
       if (dailySpent + amount > account.dailySpendLimit) return false;
     }
 
     // Check weekly limit
     if (account.weeklySpendLimit) {
-      const weeklySpent = account.weeklySpent ?? 0;
       if (weeklySpent + amount > account.weeklySpendLimit) return false;
     }
 
     // Check monthly limit
     if (account.monthlySpendLimit) {
-      const monthlySpent = account.monthlySpent ?? 0;
       if (monthlySpent + amount > account.monthlySpendLimit) return false;
     }
 
@@ -187,14 +250,11 @@ export const handleFinancialAccountCreated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    // Find account to link
-    // This would be called after we create the account and request Treasury
     console.log("Treasury financial account created:", data.id);
   },
 });
@@ -207,33 +267,39 @@ export const handleInboundTransferSucceeded = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
+    // Find stripeIdentity by treasury account
+    const stripeIdentity = await findStripeIdentityByTreasuryAccount(ctx, data.financial_account);
+    if (!stripeIdentity) {
+      console.log("StripeIdentity not found for treasury:", data.financial_account);
+      return;
+    }
+
+    // Find user's spend account (deposits go to spend by default)
     const account = await ctx.db
       .query("accounts")
-      .withIndex("by_stripe_treasury", (q) =>
-        q.eq("stripeTreasuryAccountId", data.financial_account)
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
       )
       .unique();
 
     if (!account) {
-      console.log("Account not found for treasury:", data.financial_account);
+      console.log("Spend account not found for user:", stripeIdentity.userId);
       return;
     }
 
-    // Stripe amounts are in cents, our DB stores cents - no conversion needed
     const amount = data.amount;
+    const now = Date.now();
 
-    // Update balance
     await ctx.db.patch(account._id, {
       balance: account.balance + amount,
+      updatedAt: now,
     });
 
-    // Create transaction record
     await ctx.db.insert("transactions", {
       userId: account.userId,
       accountId: account._id,
@@ -244,7 +310,7 @@ export const handleInboundTransferSucceeded = mutation({
       description: data.description || "Inbound transfer",
       stripeTransactionId: data.id,
       status: "completed",
-      createdAt: Date.now(),
+      createdAt: now,
     });
   },
 });
@@ -257,22 +323,11 @@ export const handleOutboundTransferSucceeded = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_stripe_treasury", (q) =>
-        q.eq("stripeTreasuryAccountId", data.financial_account)
-      )
-      .unique();
-
-    if (!account) return;
-
-    // Transaction should already exist from when we initiated the transfer
     const transaction = await ctx.db
       .query("transactions")
       .withIndex("by_stripe_transaction", (q) =>
@@ -281,7 +336,10 @@ export const handleOutboundTransferSucceeded = mutation({
       .unique();
 
     if (transaction) {
-      await ctx.db.patch(transaction._id, { status: "completed" });
+      await ctx.db.patch(transaction._id, {
+        status: "completed",
+        updatedAt: Date.now(),
+      });
     }
   },
 });
@@ -294,22 +352,11 @@ export const handleOutboundTransferFailed = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_stripe_treasury", (q) =>
-        q.eq("stripeTreasuryAccountId", data.financial_account)
-      )
-      .unique();
-
-    if (!account) return;
-
-    // Find and mark transaction as failed
     const transaction = await ctx.db
       .query("transactions")
       .withIndex("by_stripe_transaction", (q) =>
@@ -318,12 +365,19 @@ export const handleOutboundTransferFailed = mutation({
       .unique();
 
     if (transaction) {
-      await ctx.db.patch(transaction._id, { status: "failed" });
-
-      // Refund the amount back to balance (it was deducted when initiated)
-      await ctx.db.patch(account._id, {
-        balance: account.balance + Math.abs(transaction.amount),
+      await ctx.db.patch(transaction._id, {
+        status: "failed",
+        updatedAt: Date.now(),
       });
+
+      // Refund amount back to account
+      const account = await ctx.db.get(transaction.accountId);
+      if (account) {
+        await ctx.db.patch(account._id, {
+          balance: account.balance + Math.abs(transaction.amount),
+          updatedAt: Date.now(),
+        });
+      }
     }
 
     console.log(
@@ -343,13 +397,11 @@ export const handleInboundTransferFailed = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    // Find any pending transaction for this transfer
     const transaction = await ctx.db
       .query("transactions")
       .withIndex("by_stripe_transaction", (q) =>
@@ -358,7 +410,10 @@ export const handleInboundTransferFailed = mutation({
       .unique();
 
     if (transaction) {
-      await ctx.db.patch(transaction._id, { status: "failed" });
+      await ctx.db.patch(transaction._id, {
+        status: "failed",
+        updatedAt: Date.now(),
+      });
     }
 
     console.log(
@@ -378,26 +433,29 @@ export const handleReceivedCredit = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
+    const stripeIdentity = await findStripeIdentityByTreasuryAccount(ctx, data.financial_account);
+    if (!stripeIdentity) return;
+
     const account = await ctx.db
       .query("accounts")
-      .withIndex("by_stripe_treasury", (q) =>
-        q.eq("stripeTreasuryAccountId", data.financial_account)
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
       )
       .unique();
 
     if (!account) return;
 
-    // Stripe amounts are in cents, our DB stores cents - no conversion needed
     const amount = data.amount;
+    const now = Date.now();
 
     await ctx.db.patch(account._id, {
       balance: account.balance + amount,
+      updatedAt: now,
     });
 
     await ctx.db.insert("transactions", {
@@ -410,7 +468,7 @@ export const handleReceivedCredit = mutation({
       description: data.description || "Received credit",
       stripeTransactionId: data.id,
       status: "completed",
-      createdAt: Date.now(),
+      createdAt: now,
     });
   },
 });
@@ -423,26 +481,29 @@ export const handleReceivedDebit = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
+    const stripeIdentity = await findStripeIdentityByTreasuryAccount(ctx, data.financial_account);
+    if (!stripeIdentity) return;
+
     const account = await ctx.db
       .query("accounts")
-      .withIndex("by_stripe_treasury", (q) =>
-        q.eq("stripeTreasuryAccountId", data.financial_account)
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
       )
       .unique();
 
     if (!account) return;
 
-    // Stripe amounts are in cents, our DB stores cents - no conversion needed
     const amount = data.amount;
+    const now = Date.now();
 
     await ctx.db.patch(account._id, {
       balance: account.balance - amount,
+      updatedAt: now,
     });
 
     await ctx.db.insert("transactions", {
@@ -455,7 +516,7 @@ export const handleReceivedDebit = mutation({
       description: data.description || "Debit",
       stripeTransactionId: data.id,
       status: "completed",
-      createdAt: Date.now(),
+      createdAt: now,
     });
   },
 });
@@ -468,21 +529,11 @@ export const handleAuthorizationCreated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    // Find account by card ID
-    const account = await ctx.db
-      .query("accounts")
-      .filter((q) => q.eq(q.field("stripeIssuingCardId"), data.card.id))
-      .unique();
-
-    if (!account) return;
-
-    // Track pending authorization (amount is in cents)
     console.log(
       "Authorization created:",
       data.id,
@@ -501,7 +552,6 @@ export const handleAuthorizationUpdated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
@@ -526,28 +576,33 @@ export const handleIssuingTransaction = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
+    // Find stripeIdentity by card ID
+    const stripeIdentity = await findStripeIdentityByCardId(ctx, data.card.id);
+    if (!stripeIdentity) return;
+
+    // Find spend account
     const account = await ctx.db
       .query("accounts")
-      .filter((q) => q.eq(q.field("stripeIssuingCardId"), data.card.id))
+      .withIndex("by_user_type", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
+      )
       .unique();
 
     if (!account) return;
 
-    // Issuing amounts can be negative (refunds), use absolute value for debits
-    // Amounts are in cents - no conversion needed
     const amount = Math.abs(data.amount);
     const isRefund = data.amount > 0 || data.type === "refund";
+    const now = Date.now();
 
     if (isRefund) {
-      // Handle refund - add back to balance
       await ctx.db.patch(account._id, {
         balance: account.balance + amount,
+        updatedAt: now,
       });
 
       await ctx.db.insert("transactions", {
@@ -563,15 +618,12 @@ export const handleIssuingTransaction = mutation({
         stripeTransactionId: data.id,
         stripeAuthorizationId: data.authorization,
         status: "completed",
-        createdAt: Date.now(),
+        createdAt: now,
       });
     } else {
-      // Handle purchase - deduct from balance
       await ctx.db.patch(account._id, {
         balance: account.balance - amount,
-        dailySpent: (account.dailySpent ?? 0) + amount,
-        weeklySpent: (account.weeklySpent ?? 0) + amount,
-        monthlySpent: (account.monthlySpent ?? 0) + amount,
+        updatedAt: now,
       });
 
       await ctx.db.insert("transactions", {
@@ -587,20 +639,40 @@ export const handleIssuingTransaction = mutation({
         stripeTransactionId: data.id,
         stripeAuthorizationId: data.authorization,
         status: "completed",
-        createdAt: Date.now(),
+        createdAt: now,
       });
 
-      // Check if over budget
+      // Check if over budget - emit trust score event
       if (account.monthlySpendLimit) {
-        const newSpent = (account.monthlySpent ?? 0) + amount;
-        if (newSpent > account.monthlySpendLimit) {
+        // Compute monthly spent from transactions instead of using legacy field
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const monthlyTransactions = await ctx.db
+          .query("transactions")
+          .withIndex("by_account", (q) => q.eq("accountId", account._id))
+          .filter((q) =>
+            q.and(
+              q.gte(q.field("createdAt"), startOfMonth.getTime()),
+              q.eq(q.field("type"), "debit")
+            )
+          )
+          .collect();
+
+        const monthlySpent = monthlyTransactions.reduce(
+          (sum, t) => sum + Math.abs(t.amount),
+          0
+        );
+
+        if (monthlySpent > account.monthlySpendLimit) {
           await ctx.db.insert("trustScoreEvents", {
             userId: account.userId,
             familyId: account.familyId,
             event: "Exceeded monthly spending limit",
             eventType: "overspent_budget",
             points: -5,
-            createdAt: Date.now(),
+            createdAt: now,
           });
         }
       }
@@ -616,28 +688,44 @@ export const handleCardCreated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    // Link card to account based on metadata
-    const userId = data.metadata?.userId;
-    if (!userId) return;
+    const userIdStr = data.metadata?.userId as string | undefined;
+    if (!userIdStr) return;
 
-    const spendAccount = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", userId as any).eq("type", "spend")
-      )
+    const userId = userIdStr as Id<"users">;
+
+    // Verify user exists
+    const user = await ctx.db.get(userId);
+    if (!user) return;
+
+    const now = Date.now();
+
+    // Update stripeIdentities table
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
-    if (spendAccount) {
-      await ctx.db.patch(spendAccount._id, {
+    if (stripeIdentity) {
+      await ctx.db.patch(stripeIdentity._id, {
         stripeIssuingCardId: data.id,
+        updatedAt: now,
+      });
+    } else {
+      // Create stripeIdentity if it doesn't exist
+      await ctx.db.insert("stripeIdentities", {
+        userId,
+        stripeIssuingCardId: data.id,
+        createdAt: now,
+        updatedAt: now,
       });
     }
+
+    console.log("Card created:", data.id, "for user:", userIdStr);
   },
 });
 
@@ -649,10 +737,40 @@ export const handleCardholderCreated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
+    }
+
+    const userIdStr = data.metadata?.userId as string | undefined;
+    if (!userIdStr) return;
+
+    const userId = userIdStr as Id<"users">;
+
+    // Verify user exists
+    const user = await ctx.db.get(userId);
+    if (!user) return;
+
+    const now = Date.now();
+
+    // Update stripeIdentities table
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (stripeIdentity) {
+      await ctx.db.patch(stripeIdentity._id, {
+        stripeCardholderId: data.id,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("stripeIdentities", {
+        userId,
+        stripeCardholderId: data.id,
+        createdAt: now,
+        updatedAt: now,
+      });
     }
 
     console.log(
@@ -674,21 +792,44 @@ export const handleIdentityVerified = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    const userId = data.metadata?.userId;
-    if (!userId) return;
+    const userIdStr = data.metadata?.userId as string | undefined;
+    if (!userIdStr) return;
 
-    const user = await ctx.db.get(userId as any);
-    if (user) {
-      await ctx.db.patch(user._id, {
-        kycStatus: "verified",
+    const userId = userIdStr as Id<"users">;
+    const user = await ctx.db.get(userId);
+    if (!user) return;
+
+    const now = Date.now();
+
+    // Update or create kycVerifications record
+    const existingKyc = await ctx.db
+      .query("kycVerifications")
+      .withIndex("by_session", (q) => q.eq("stripeIdentitySessionId", data.id))
+      .unique();
+
+    if (existingKyc) {
+      await ctx.db.patch(existingKyc._id, {
+        status: "verified",
+        verifiedAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("kycVerifications", {
+        userId,
+        stripeIdentitySessionId: data.id,
+        status: "verified",
+        verifiedAt: now,
+        createdAt: now,
+        updatedAt: now,
       });
     }
+
+    console.log("Identity verified for user:", userIdStr);
   },
 });
 
@@ -700,19 +841,37 @@ export const handleIdentityRequiresInput = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    const userId = data.metadata?.userId;
-    if (!userId) return;
+    const userIdStr = data.metadata?.userId as string | undefined;
+    if (!userIdStr) return;
 
-    const user = await ctx.db.get(userId as any);
-    if (user) {
-      await ctx.db.patch(user._id, {
-        kycStatus: "pending",
+    const userId = userIdStr as Id<"users">;
+    const user = await ctx.db.get(userId);
+    if (!user) return;
+
+    const now = Date.now();
+
+    const existingKyc = await ctx.db
+      .query("kycVerifications")
+      .withIndex("by_session", (q) => q.eq("stripeIdentitySessionId", data.id))
+      .unique();
+
+    if (existingKyc) {
+      await ctx.db.patch(existingKyc._id, {
+        status: "processing",
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("kycVerifications", {
+        userId,
+        stripeIdentitySessionId: data.id,
+        status: "processing",
+        createdAt: now,
+        updatedAt: now,
       });
     }
   },
@@ -726,20 +885,39 @@ export const handleIdentityCanceled = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    const userId = data.metadata?.userId;
-    if (!userId) return;
+    const userIdStr = data.metadata?.userId as string | undefined;
+    if (!userIdStr) return;
 
-    const user = await ctx.db.get(userId as any);
-    if (user) {
-      // Keep as pending so they can retry
-      await ctx.db.patch(user._id, {
-        kycStatus: "pending",
+    const userId = userIdStr as Id<"users">;
+    const user = await ctx.db.get(userId);
+    if (!user) return;
+
+    const now = Date.now();
+
+    const existingKyc = await ctx.db
+      .query("kycVerifications")
+      .withIndex("by_session", (q) => q.eq("stripeIdentitySessionId", data.id))
+      .unique();
+
+    if (existingKyc) {
+      await ctx.db.patch(existingKyc._id, {
+        status: "failed",
+        failureReason: data.last_error?.reason,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("kycVerifications", {
+        userId,
+        stripeIdentitySessionId: data.id,
+        status: "failed",
+        failureReason: data.last_error?.reason,
+        createdAt: now,
+        updatedAt: now,
       });
     }
 
@@ -798,34 +976,48 @@ export const handleSubscriptionCreated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
     // Find user by Stripe customer ID
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("stripeCustomerId"), data.customer))
-      .unique();
-
+    const user = await findUserByStripeCustomerId(ctx, data.customer);
     if (!user) {
       console.log("User not found for customer:", data.customer);
       return;
     }
 
-    // Get tier from price lookup key
+    if (!user.familyId) {
+      console.log("User has no family, cannot create subscription:", user._id);
+      return;
+    }
+
     const lookupKey = data.items?.data[0]?.price?.lookup_key;
     const tier = lookupKeyToTier(lookupKey);
     const status = mapSubscriptionStatus(data.status);
+    const now = Date.now();
 
-    await ctx.db.patch(user._id, {
-      stripeSubscriptionId: data.id,
-      subscriptionTier: tier,
-      subscriptionStatus: status,
-      trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
-    });
+    // Check if subscription already exists
+    const existingSub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_stripe_subscription", (q) =>
+        q.eq("stripeSubscriptionId", data.id)
+      )
+      .unique();
+
+    if (!existingSub) {
+      await ctx.db.insert("subscriptions", {
+        userId: user._id,
+        familyId: user.familyId,
+        stripeSubscriptionId: data.id,
+        tier,
+        status,
+        trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     console.log(
       "Subscription created:",
@@ -846,60 +1038,63 @@ export const handleSubscriptionUpdated = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    // Find user by subscription ID
-    const user = await ctx.db
-      .query("users")
+    const lookupKey = data.items?.data[0]?.price?.lookup_key;
+    const tier = lookupKeyToTier(lookupKey);
+    const status = mapSubscriptionStatus(data.status);
+    const now = Date.now();
+
+    // Find subscription by Stripe subscription ID
+    const subscription = await ctx.db
+      .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
         q.eq("stripeSubscriptionId", data.id)
       )
       .unique();
 
-    if (!user) {
-      // Try by customer ID as fallback
-      const userByCustomer = await ctx.db
-        .query("users")
-        .filter((q) => q.eq(q.field("stripeCustomerId"), data.customer))
-        .unique();
-
-      if (!userByCustomer) {
-        console.log("User not found for subscription:", data.id);
-        return;
-      }
-
-      // Update with subscription ID
-      const lookupKey = data.items?.data[0]?.price?.lookup_key;
-      const tier = lookupKeyToTier(lookupKey);
-      const status = mapSubscriptionStatus(data.status);
-
-      await ctx.db.patch(userByCustomer._id, {
-        stripeSubscriptionId: data.id,
-        subscriptionTier: tier,
-        subscriptionStatus: status,
+    if (subscription) {
+      await ctx.db.patch(subscription._id, {
+        tier,
+        status,
         trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
+        updatedAt: now,
       });
 
+      console.log(
+        "Subscription updated:",
+        data.id,
+        "Tier:",
+        tier,
+        "Status:",
+        status
+      );
       return;
     }
 
-    // Get tier from price lookup key
-    const lookupKey = data.items?.data[0]?.price?.lookup_key;
-    const tier = lookupKeyToTier(lookupKey);
-    const status = mapSubscriptionStatus(data.status);
+    // Subscription not found - try to create it
+    const user = await findUserByStripeCustomerId(ctx, data.customer);
+    if (!user || !user.familyId) {
+      console.log("User not found or has no family for customer:", data.customer);
+      return;
+    }
 
-    await ctx.db.patch(user._id, {
-      subscriptionTier: tier,
-      subscriptionStatus: status,
+    await ctx.db.insert("subscriptions", {
+      userId: user._id,
+      familyId: user.familyId,
+      stripeSubscriptionId: data.id,
+      tier,
+      status,
       trialEndsAt: data.trial_end ? data.trial_end * 1000 : undefined,
+      createdAt: now,
+      updatedAt: now,
     });
 
     console.log(
-      "Subscription updated:",
+      "Subscription created (from update event):",
       data.id,
       "Tier:",
       tier,
@@ -917,31 +1112,28 @@ export const handleSubscriptionDeleted = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    // Find user by subscription ID
-    const user = await ctx.db
-      .query("users")
+    const subscription = await ctx.db
+      .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
         q.eq("stripeSubscriptionId", data.id)
       )
       .unique();
 
-    if (!user) {
-      console.log("User not found for subscription:", data.id);
+    if (!subscription) {
+      console.log("Subscription not found:", data.id);
       return;
     }
 
-    // Downgrade to starter tier
-    await ctx.db.patch(user._id, {
-      subscriptionTier: "starter",
-      subscriptionStatus: "canceled",
-      stripeSubscriptionId: undefined,
-      trialEndsAt: undefined,
+    // Update to canceled status (or delete the record)
+    await ctx.db.patch(subscription._id, {
+      status: "canceled",
+      tier: "starter",
+      updatedAt: Date.now(),
     });
 
     console.log("Subscription deleted, downgraded to starter:", data.id);
@@ -956,34 +1148,29 @@ export const handleInvoicePaymentSucceeded = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    if (!data.subscription) {
-      // Not a subscription invoice
-      return;
-    }
+    if (!data.subscription) return;
 
-    // Find user by subscription ID
-    const user = await ctx.db
-      .query("users")
+    const subscription = await ctx.db
+      .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
         q.eq("stripeSubscriptionId", data.subscription!)
       )
       .unique();
 
-    if (!user) {
-      console.log("User not found for subscription:", data.subscription);
+    if (!subscription) {
+      console.log("Subscription not found:", data.subscription);
       return;
     }
 
-    // Ensure status is active after successful payment
-    if (user.subscriptionStatus !== "active") {
-      await ctx.db.patch(user._id, {
-        subscriptionStatus: "active",
+    if (subscription.status !== "active") {
+      await ctx.db.patch(subscription._id, {
+        status: "active",
+        updatedAt: Date.now(),
       });
     }
 
@@ -1004,33 +1191,28 @@ export const handleInvoicePaymentFailed = mutation({
     eventType: v.optional(v.string()),
   },
   handler: async (ctx, { data, eventId, eventType }) => {
-    // Idempotency check
     if (eventId && eventType) {
       const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
       if (!shouldProcess) return;
     }
 
-    if (!data.subscription) {
-      // Not a subscription invoice
-      return;
-    }
+    if (!data.subscription) return;
 
-    // Find user by subscription ID
-    const user = await ctx.db
-      .query("users")
+    const subscription = await ctx.db
+      .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
         q.eq("stripeSubscriptionId", data.subscription!)
       )
       .unique();
 
-    if (!user) {
-      console.log("User not found for subscription:", data.subscription);
+    if (!subscription) {
+      console.log("Subscription not found:", data.subscription);
       return;
     }
 
-    // Mark as past_due
-    await ctx.db.patch(user._id, {
-      subscriptionStatus: "past_due",
+    await ctx.db.patch(subscription._id, {
+      status: "past_due",
+      updatedAt: Date.now(),
     });
 
     console.log(

@@ -140,7 +140,7 @@ export default function FamilyScreen() {
             </TouchableOpacity>
           </View>
 
-          {kids?.map((kid) => (
+          {kids?.filter((k): k is NonNullable<typeof k> => k !== null).map((kid) => (
             <TouchableOpacity
               key={kid.id}
               className="mb-3 rounded-xl bg-surface p-4 shadow-sm"

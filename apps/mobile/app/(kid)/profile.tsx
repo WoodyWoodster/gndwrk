@@ -14,6 +14,10 @@ export default function ProfileScreen() {
   const currentUser = useQuery(api.users.getCurrentUser);
   const trustScore = useQuery(api.trustScore.getMyCurrent);
   const savingsGoals = useQuery(api.savingsGoals.getMySavingsGoals);
+  const userStats = useQuery(
+    api.userStats.getUserStats,
+    currentUser ? { userId: currentUser._id } : "skip"
+  );
 
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -54,19 +58,19 @@ export default function ProfileScreen() {
         <View className="mb-6 flex-row space-x-3">
           <View className="flex-1 items-center rounded-xl bg-surface p-4 shadow-sm">
             <Text className="text-2xl font-bold text-secondary">
-              {currentUser?.choresCompleted ?? 0}
+              {userStats?.choresCompleted ?? 0}
             </Text>
             <Text className="text-sm text-text-muted">Chores Done</Text>
           </View>
           <View className="flex-1 items-center rounded-xl bg-surface p-4 shadow-sm">
             <Text className="text-2xl font-bold text-primary">
-              {currentUser?.savingStreak ?? 0}
+              {userStats?.savingStreak ?? 0}
             </Text>
             <Text className="text-sm text-text-muted">Saving Streak</Text>
           </View>
           <View className="flex-1 items-center rounded-xl bg-surface p-4 shadow-sm">
             <Text className="text-2xl font-bold text-accent">
-              {currentUser?.loansRepaid ?? 0}
+              {userStats?.loansRepaid ?? 0}
             </Text>
             <Text className="text-sm text-text-muted">Loans Repaid</Text>
           </View>

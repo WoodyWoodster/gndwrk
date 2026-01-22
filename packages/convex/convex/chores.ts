@@ -156,6 +156,7 @@ export const claim = mutation({
     await ctx.db.patch(choreId, {
       status: "claimed",
       assignedTo: user._id,
+      updatedAt: Date.now(),
     });
 
     return { success: true };
@@ -188,10 +189,12 @@ export const complete = mutation({
       throw new Error("Chore must be claimed first");
     }
 
+    const now = Date.now();
     await ctx.db.patch(choreId, {
       status: "pending_approval",
-      completedAt: Date.now(),
+      completedAt: now,
       proofPhotoUrl,
+      updatedAt: now,
     });
 
     return { success: true };
@@ -237,15 +240,16 @@ export const approve = mutation({
 
     const now = Date.now();
 
-    // Get kid for updating chore count, and parallelize all other operations
-    const [kid] = await Promise.all([
-      ctx.db.get(chore.assignedTo!),
+    // Parallelize all operations
+    await Promise.all([
       ctx.db.patch(choreId, {
         status: "paid",
         approvedAt: now,
+        updatedAt: now,
       }),
       ctx.db.patch(kidAccount._id, {
         balance: kidAccount.balance + chore.payout,
+        updatedAt: now,
       }),
       ctx.db.insert("transactions", {
         userId: chore.assignedTo!,
@@ -268,13 +272,6 @@ export const approve = mutation({
         createdAt: now,
       }),
     ]);
-
-    // Update kid's chores completed count
-    if (kid) {
-      await ctx.db.patch(kid._id, {
-        choresCompleted: (kid.choresCompleted ?? 0) + 1,
-      });
-    }
 
     return { success: true };
   },
@@ -308,6 +305,7 @@ export const reject = mutation({
     await ctx.db.patch(choreId, {
       status: "claimed",
       completedAt: undefined,
+      updatedAt: Date.now(),
     });
 
     return { success: true };
