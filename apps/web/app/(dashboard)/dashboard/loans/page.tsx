@@ -4,14 +4,15 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { formatCurrency, formatDate, formatRelativeTime } from "@/lib/utils";
+import { LoanIcon } from "@/components/icons";
 
 type LoanStatus = "all" | "pending" | "active" | "paid";
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-700",
-    active: "bg-blue-100 text-blue-700",
-    paid: "bg-green-100 text-green-700",
+    pending: "bg-accent-100 text-accent",
+    active: "bg-primary-100 text-primary",
+    paid: "bg-secondary-100 text-secondary",
     defaulted: "bg-red-100 text-red-700",
   };
 
@@ -24,7 +25,7 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-gray-100 text-gray-700"}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status] ?? "bg-gray-100 text-gray-700"}`}
     >
       {labels[status] ?? status}
     </span>
@@ -67,11 +68,11 @@ function LoanCard({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary-100 to-secondary-100 text-sm font-bold text-primary">
               {loan.borrowerName[0]}
             </span>
             <div>
@@ -123,7 +124,7 @@ function LoanCard({
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-gray-200">
             <div
-              className="h-full rounded-full bg-green-500 transition-all"
+              className="h-full rounded-full bg-secondary transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -133,7 +134,7 @@ function LoanCard({
       {/* Meta Info */}
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-500">
         {loan.interestRate > 0 && (
-          <span className="rounded bg-gray-100 px-2 py-0.5">
+          <span className="rounded-lg bg-gray-100 px-2 py-0.5">
             {loan.interestRate}% APR
           </span>
         )}
@@ -148,13 +149,13 @@ function LoanCard({
         <div className="mt-4 flex gap-2 border-t border-gray-100 pt-4">
           <button
             onClick={() => setShowApproveModal(true)}
-            className="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+            className="flex-1 rounded-xl bg-secondary px-3 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-secondary-600 hover:shadow-elevation-2"
           >
             Approve
           </button>
           <button
             onClick={onReject}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
           >
             Decline
           </button>
@@ -164,7 +165,7 @@ function LoanCard({
       {/* Approve Modal */}
       {showApproveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-elevation-3">
             <h3 className="text-lg font-semibold text-gray-900">
               Approve Loan Request
             </h3>
@@ -185,7 +186,7 @@ function LoanCard({
                 min="0"
                 max="50"
                 step="0.5"
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Enter 0 for an interest-free loan
@@ -195,13 +196,13 @@ function LoanCard({
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowApproveModal(false)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApprove}
-                className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                className="flex-1 rounded-xl bg-secondary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-secondary-600 hover:shadow-elevation-2"
               >
                 Approve Loan
               </button>
@@ -218,16 +219,18 @@ function StatCard({
   value,
   subtitle,
   icon,
+  gradient,
 }: {
   title: string;
   value: string;
   subtitle?: string;
   icon: React.ReactNode;
+  gradient?: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
+        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${gradient ?? "bg-gradient-to-br from-primary-100 to-secondary-100"}`}>
           {icon}
         </div>
         <div>
@@ -298,112 +301,48 @@ export default function LoansPage() {
         <StatCard
           title="Pending Requests"
           value={String(pendingCount)}
-          icon={
-            <svg
-              className="h-5 w-5 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-accent-100 to-amber-100"
+          icon={<LoanIcon size={24} />}
         />
         <StatCard
           title="Active Loans"
           value={String(activeCount)}
-          icon={
-            <svg
-              className="h-5 w-5 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-primary-100 to-secondary-100"
+          icon={<LoanIcon size={24} />}
         />
         <StatCard
           title="Outstanding"
           value={formatCurrency(totalOutstanding)}
-          icon={
-            <svg
-              className="h-5 w-5 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-bucket-spend-100 to-primary-100"
+          icon={<LoanIcon size={24} />}
         />
         <StatCard
           title="Paid Off"
           value={formatCurrency(totalPaidOff)}
-          icon={
-            <svg
-              className="h-5 w-5 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-secondary-100 to-bucket-save-100"
+          icon={<LoanIcon size={24} />}
         />
       </div>
 
       {/* Pending Alert */}
       {pendingCount > 0 && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-6 rounded-2xl border border-accent-200 bg-gradient-to-r from-accent-50 to-amber-50 p-4 shadow-elevation-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
-              <svg
-                className="h-5 w-5 text-amber-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-100">
+              <LoanIcon size={24} />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-amber-800">
+              <p className="font-semibold text-accent-800">
                 {pendingCount} loan request{pendingCount > 1 ? "s" : ""} waiting
                 for your approval
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-accent-700">
                 Review and approve or decline loan requests from your kids.
               </p>
             </div>
             <button
               onClick={() => setFilter("pending")}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-accent-600 hover:shadow-elevation-2"
             >
               Review
             </button>
@@ -422,9 +361,9 @@ export default function LoansPage() {
           <button
             key={key}
             onClick={() => setFilter(key as LoanStatus)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
               filter === key
-                ? "bg-primary text-white"
+                ? "bg-primary text-white shadow-elevation-1"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
@@ -446,21 +385,11 @@ export default function LoansPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <h3 className="mt-4 font-medium text-gray-900">
+        <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white/50 p-8 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
+            <LoanIcon size={32} />
+          </div>
+          <h3 className="mt-4 font-semibold text-gray-900">
             {filter === "all" ? "No loans yet" : `No ${filter} loans`}
           </h3>
           <p className="mt-1 text-sm text-gray-500">

@@ -154,13 +154,13 @@ export const getInviteCode = query({
     const family = await ctx.db.get(familyId);
     if (!family) throw new Error("Family not found");
 
-    // Only owner can see the code
+    // Any parent in the family can see the code
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
-    if (!user || family.ownerId !== user._id) {
+    if (!user || user.familyId !== familyId || user.role !== "parent") {
       throw new Error("Not authorized");
     }
 

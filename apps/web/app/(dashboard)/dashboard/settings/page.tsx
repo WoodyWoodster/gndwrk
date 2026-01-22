@@ -15,7 +15,7 @@ function SettingsSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1">
       <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
       <p className="text-sm text-gray-500">{description}</p>
       <div className="mt-6">{children}</div>
@@ -73,17 +73,17 @@ function FamilySettings() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={family.name}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+              className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
             />
             <button
               onClick={handleSave}
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-600"
+              className="rounded-xl bg-primary px-4 py-1.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2"
             >
               Save
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              className="rounded-xl border border-gray-300 px-4 py-1.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -94,7 +94,7 @@ function FamilySettings() {
               setName(family.name);
               setEditing(true);
             }}
-            className="text-sm font-medium text-primary hover:text-primary-600"
+            className="text-sm font-semibold text-primary hover:text-primary-600"
           >
             Edit
           </button>
@@ -147,7 +147,7 @@ function AccountSettings() {
       >
         <button
           onClick={() => signOut()}
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-1.5 text-sm font-semibold text-red-600 transition-all hover:bg-red-100"
         >
           Sign Out
         </button>
@@ -256,7 +256,7 @@ function DangerZone() {
       >
         <button
           onClick={() => setShowConfirm(true)}
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-1.5 text-sm font-semibold text-red-600 transition-all hover:bg-red-100"
         >
           Delete Family
         </button>
@@ -264,7 +264,7 @@ function DangerZone() {
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-white p-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-elevation-3">
             <h3 className="text-lg font-semibold text-gray-900">
               Delete Family?
             </h3>
@@ -276,7 +276,7 @@ function DangerZone() {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowConfirm(false)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -286,7 +286,7 @@ function DangerZone() {
                   alert("Family deletion not yet implemented");
                   setShowConfirm(false);
                 }}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                className="flex-1 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-red-700 hover:shadow-elevation-2"
               >
                 Delete Family
               </button>

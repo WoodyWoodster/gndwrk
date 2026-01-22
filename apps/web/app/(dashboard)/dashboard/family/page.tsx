@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { formatCurrency } from "@/lib/utils";
+import { FamilyIcon } from "@/components/icons";
 
 function KidCard({
   kid,
@@ -20,9 +21,9 @@ function KidCard({
   };
 }) {
   const getTrustScoreColor = (score: number) => {
-    if (score >= 750) return "text-green-600 bg-green-100";
-    if (score >= 650) return "text-blue-600 bg-blue-100";
-    if (score >= 550) return "text-amber-600 bg-amber-100";
+    if (score >= 750) return "text-secondary bg-secondary-100";
+    if (score >= 650) return "text-primary bg-primary-100";
+    if (score >= 550) return "text-accent bg-accent-100";
     return "text-gray-600 bg-gray-100";
   };
 
@@ -34,9 +35,9 @@ function KidCard({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-start gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary-100 to-secondary-100">
           {kid.imageUrl ? (
             <img
               src={kid.imageUrl}
@@ -54,9 +55,10 @@ function KidCard({
             {kid.firstName} {kid.lastName}
           </h3>
           <div
-            className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium ${getTrustScoreColor(kid.trustScore)}`}
+            className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium ${getTrustScoreColor(kid.trustScore)}`}
           >
-            {getTrustScoreLabel(kid.trustScore)} ({kid.trustScore})
+            <span>{getTrustScoreLabel(kid.trustScore)}</span>
+            <span className="opacity-70">({kid.trustScore})</span>
           </div>
         </div>
         <div className="text-right">
@@ -68,25 +70,25 @@ function KidCard({
       </div>
 
       <div className="mt-6 grid grid-cols-4 gap-3">
-        <div className="rounded-lg bg-primary-50 p-3">
-          <p className="text-xs font-medium text-primary-700">Spend</p>
-          <p className="mt-1 text-sm font-semibold text-primary-900">
+        <div className="rounded-xl bg-bucket-spend/10 p-3">
+          <p className="text-xs font-medium text-bucket-spend">Spend</p>
+          <p className="mt-1 font-semibold text-gray-900">
             {formatCurrency(kid.spendBalance)}
           </p>
         </div>
-        <div className="rounded-lg bg-green-50 p-3">
-          <p className="text-xs font-medium text-green-700">Save</p>
-          <p className="mt-1 text-sm font-semibold text-green-900">
+        <div className="rounded-xl bg-bucket-save/10 p-3">
+          <p className="text-xs font-medium text-bucket-save">Save</p>
+          <p className="mt-1 font-semibold text-gray-900">
             {formatCurrency(kid.saveBalance)}
           </p>
         </div>
-        <div className="rounded-lg bg-pink-50 p-3">
-          <p className="text-xs font-medium text-pink-700">Give</p>
-          <p className="mt-1 text-sm font-semibold text-pink-900">$0.00</p>
+        <div className="rounded-xl bg-bucket-give/10 p-3">
+          <p className="text-xs font-medium text-bucket-give">Give</p>
+          <p className="mt-1 font-semibold text-gray-900">$0.00</p>
         </div>
-        <div className="rounded-lg bg-amber-50 p-3">
-          <p className="text-xs font-medium text-amber-700">Invest</p>
-          <p className="mt-1 text-sm font-semibold text-amber-900">$0.00</p>
+        <div className="rounded-xl bg-bucket-invest/10 p-3">
+          <p className="text-xs font-medium text-bucket-invest">Invest</p>
+          <p className="mt-1 font-semibold text-gray-900">$0.00</p>
         </div>
       </div>
     </div>
@@ -108,22 +110,10 @@ function InviteCodeCard({ familyId }: { familyId: string }) {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1">
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
-          <svg
-            className="h-6 w-6 text-primary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-            />
-          </svg>
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-100 to-secondary-100">
+          <FamilyIcon size={24} />
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900">Family Invite Code</h3>
@@ -134,14 +124,14 @@ function InviteCodeCard({ familyId }: { familyId: string }) {
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <div className="flex-1 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-center">
+        <div className="flex-1 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-center">
           <span className="font-mono text-2xl font-bold tracking-wider text-gray-900">
             {inviteCode ?? "------"}
           </span>
         </div>
         <button
           onClick={copyCode}
-          className="rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white hover:bg-primary-600"
+          className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2"
         >
           {copied ? "Copied!" : "Copy"}
         </button>
@@ -184,7 +174,7 @@ function AllocationSettingsCard({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-gray-900">
@@ -197,7 +187,7 @@ function AllocationSettingsCard({
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-sm font-medium text-primary hover:text-primary-600"
+            className="text-sm font-semibold text-primary hover:text-primary-600"
           >
             Edit
           </button>
@@ -207,10 +197,10 @@ function AllocationSettingsCard({
       {editing ? (
         <div className="mt-4 space-y-3">
           {[
-            { key: "spend", label: "Spend", color: "primary" },
-            { key: "save", label: "Save", color: "green" },
-            { key: "give", label: "Give", color: "pink" },
-            { key: "invest", label: "Invest", color: "amber" },
+            { key: "spend", label: "Spend", color: "bucket-spend" },
+            { key: "save", label: "Save", color: "bucket-save" },
+            { key: "give", label: "Give", color: "bucket-give" },
+            { key: "invest", label: "Invest", color: "bucket-invest" },
           ].map(({ key, label }) => (
             <div key={key} className="flex items-center gap-3">
               <label className="w-16 text-sm font-medium text-gray-700">
@@ -227,14 +217,14 @@ function AllocationSettingsCard({
                     [key]: parseInt(e.target.value) || 0,
                   })
                 }
-                className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center text-sm"
+                className="w-20 rounded-xl border border-gray-300 px-3 py-2 text-center text-sm focus:border-primary focus:ring-1 focus:ring-primary"
               />
               <span className="text-sm text-gray-500">%</span>
             </div>
           ))}
 
           <div
-            className={`text-sm font-medium ${isValid ? "text-green-600" : "text-red-600"}`}
+            className={`text-sm font-medium ${isValid ? "text-secondary" : "text-red-600"}`}
           >
             Total: {total}% {!isValid && "(must equal 100%)"}
           </div>
@@ -243,7 +233,7 @@ function AllocationSettingsCard({
             <button
               onClick={handleSave}
               disabled={!isValid}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
+              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2 disabled:opacity-50"
             >
               Save
             </button>
@@ -252,7 +242,7 @@ function AllocationSettingsCard({
                 setAllocation(currentAllocation);
                 setEditing(false);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -260,27 +250,27 @@ function AllocationSettingsCard({
         </div>
       ) : (
         <div className="mt-4 grid grid-cols-4 gap-3">
-          <div className="rounded-lg bg-primary-50 p-3 text-center">
-            <p className="text-xs font-medium text-primary-700">Spend</p>
-            <p className="mt-1 text-lg font-bold text-primary-900">
+          <div className="rounded-xl bg-bucket-spend/10 p-3 text-center">
+            <p className="text-xs font-medium text-bucket-spend">Spend</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
               {currentAllocation.spend}%
             </p>
           </div>
-          <div className="rounded-lg bg-green-50 p-3 text-center">
-            <p className="text-xs font-medium text-green-700">Save</p>
-            <p className="mt-1 text-lg font-bold text-green-900">
+          <div className="rounded-xl bg-bucket-save/10 p-3 text-center">
+            <p className="text-xs font-medium text-bucket-save">Save</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
               {currentAllocation.save}%
             </p>
           </div>
-          <div className="rounded-lg bg-pink-50 p-3 text-center">
-            <p className="text-xs font-medium text-pink-700">Give</p>
-            <p className="mt-1 text-lg font-bold text-pink-900">
+          <div className="rounded-xl bg-bucket-give/10 p-3 text-center">
+            <p className="text-xs font-medium text-bucket-give">Give</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
               {currentAllocation.give}%
             </p>
           </div>
-          <div className="rounded-lg bg-amber-50 p-3 text-center">
-            <p className="text-xs font-medium text-amber-700">Invest</p>
-            <p className="mt-1 text-lg font-bold text-amber-900">
+          <div className="rounded-xl bg-bucket-invest/10 p-3 text-center">
+            <p className="text-xs font-medium text-bucket-invest">Invest</p>
+            <p className="mt-1 text-lg font-bold text-gray-900">
               {currentAllocation.invest}%
             </p>
           </div>
@@ -342,21 +332,11 @@ export default function FamilyPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-              />
-            </svg>
-            <h3 className="mt-4 font-medium text-gray-900">No kids yet</h3>
+          <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white/50 p-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
+              <FamilyIcon size={32} />
+            </div>
+            <h3 className="mt-4 font-semibold text-gray-900">No kids yet</h3>
             <p className="mt-1 text-sm text-gray-500">
               Share your family invite code with your kids to get started.
             </p>

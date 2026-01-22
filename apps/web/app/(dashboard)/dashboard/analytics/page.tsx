@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
+import { TrustScoreIcon, BucketIcon } from "@/components/icons";
 
 type TimeRange = "week" | "month" | "year";
 
@@ -12,30 +13,23 @@ function StatCard({
   value,
   change,
   icon,
-  color = "primary",
+  gradient,
 }: {
   title: string;
   value: string;
   change?: number;
   icon: React.ReactNode;
-  color?: "primary" | "green" | "amber" | "pink";
+  gradient?: string;
 }) {
-  const colorClasses = {
-    primary: "bg-primary-100 text-primary",
-    green: "bg-green-100 text-green-600",
-    amber: "bg-amber-100 text-amber-600",
-    pink: "bg-pink-100 text-pink-600",
-  };
-
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-sm font-medium text-gray-500">{title}</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
           {change !== undefined && (
             <p
-              className={`mt-1 text-xs ${change >= 0 ? "text-green-600" : "text-red-600"}`}
+              className={`mt-1 text-xs ${change >= 0 ? "text-secondary" : "text-red-600"}`}
             >
               {change >= 0 ? "+" : ""}
               {change}% from last period
@@ -43,7 +37,7 @@ function StatCard({
           )}
         </div>
         <div
-          className={`flex h-12 w-12 items-center justify-center rounded-lg ${colorClasses[color]}`}
+          className={`flex h-14 w-14 items-center justify-center rounded-xl ${gradient ?? "bg-gradient-to-br from-primary-100 to-secondary-100"}`}
         >
           {icon}
         </div>
@@ -241,7 +235,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Time Range Filter */}
-        <div className="flex rounded-lg border border-gray-200 bg-white p-1">
+        <div className="flex rounded-xl border border-gray-200 bg-white p-1 shadow-elevation-1">
           {[
             { key: "week", label: "Week" },
             { key: "month", label: "Month" },
@@ -250,9 +244,9 @@ export default function AnalyticsPage() {
             <button
               key={key}
               onClick={() => setTimeRange(key as TimeRange)}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                 timeRange === key
-                  ? "bg-primary text-white"
+                  ? "bg-primary text-white shadow-elevation-1"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -267,87 +261,32 @@ export default function AnalyticsPage() {
         <StatCard
           title="Total Balance"
           value={formatCurrency(totalBalance)}
-          icon={
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-bucket-spend-100 to-bucket-invest-100"
+          icon={<BucketIcon size={28} />}
         />
         <StatCard
           title="Total Savings"
           value={formatCurrency(totalSavings)}
-          color="green"
-          icon={
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-bucket-save-100 to-secondary-100"
+          icon={<BucketIcon size={28} />}
         />
         <StatCard
           title="Period Earnings"
           value={formatCurrency(periodEarnings)}
-          color="amber"
-          icon={
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-accent-100 to-amber-100"
+          icon={<TrustScoreIcon size={28} />}
         />
         <StatCard
           title="Period Spending"
           value={formatCurrency(periodSpending)}
-          color="pink"
-          icon={
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-bucket-spend-100 to-primary-100"
+          icon={<BucketIcon size={28} />}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Spending by Category */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1">
           <h2 className="text-lg font-semibold text-gray-900">
             Spending by Category
           </h2>
@@ -375,7 +314,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Kid Balances */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1">
           <h2 className="text-lg font-semibold text-gray-900">Kid Balances</h2>
           <p className="text-sm text-gray-500">Current balance breakdown</p>
 
@@ -384,9 +323,9 @@ export default function AnalyticsPage() {
               {kids.map((kid) => (
                 <div
                   key={kid.id}
-                  className="flex items-center gap-4 rounded-lg bg-gray-50 p-4"
+                  className="flex items-center gap-4 rounded-xl bg-gradient-to-br from-primary-50 to-secondary-50 p-4"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary-100 to-secondary-100">
                     <span className="text-lg font-bold text-primary">
                       {kid.firstName[0]}
                     </span>
@@ -396,13 +335,13 @@ export default function AnalyticsPage() {
                     <div className="mt-1 flex gap-4 text-xs text-gray-500">
                       <span>
                         Spend:{" "}
-                        <span className="font-medium text-gray-700">
+                        <span className="font-medium text-bucket-spend">
                           {formatCurrency(kid.spendBalance)}
                         </span>
                       </span>
                       <span>
                         Save:{" "}
-                        <span className="font-medium text-gray-700">
+                        <span className="font-medium text-bucket-save">
                           {formatCurrency(kid.saveBalance)}
                         </span>
                       </span>
@@ -426,7 +365,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Recent Transactions */}
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1">
         <h2 className="text-lg font-semibold text-gray-900">
           Recent Transactions
         </h2>

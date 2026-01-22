@@ -3,6 +3,12 @@
 import { useQuery } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { formatCurrency } from "@/lib/utils";
+import {
+  BucketIcon,
+  FamilyIcon,
+  ChoreIcon,
+  LoanIcon,
+} from "@/components/icons";
 
 function StatCard({
   title,
@@ -10,31 +16,35 @@ function StatCard({
   change,
   changeLabel,
   icon,
+  gradient,
 }: {
   title: string;
   value: string;
   change?: number;
   changeLabel?: string;
   icon: React.ReactNode;
+  gradient?: string;
 }) {
   const isPositive = change && change > 0;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-500">{title}</p>
           <p className="mt-1 text-3xl font-bold text-gray-900">{value}</p>
           {change !== undefined && (
             <p
-              className={`mt-1 text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}
+              className={`mt-1 text-sm ${isPositive ? "text-secondary" : "text-red-600"}`}
             >
               {isPositive ? "+" : ""}
               {change}% {changeLabel}
             </p>
           )}
         </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
+        <div
+          className={`flex h-14 w-14 items-center justify-center rounded-xl ${gradient ?? "bg-gradient-to-br from-primary-100 to-secondary-100"}`}
+        >
           {icon}
         </div>
       </div>
@@ -55,16 +65,23 @@ function KidOverviewCard({
   };
 }) {
   const getTrustScoreColor = (score: number) => {
-    if (score >= 750) return "text-green-600 bg-green-100";
-    if (score >= 650) return "text-blue-600 bg-blue-100";
-    if (score >= 550) return "text-amber-600 bg-amber-100";
+    if (score >= 750) return "text-secondary bg-secondary-100";
+    if (score >= 650) return "text-primary bg-primary-100";
+    if (score >= 550) return "text-accent bg-accent-100";
     return "text-gray-600 bg-gray-100";
   };
 
+  const getTrustScoreLabel = (score: number) => {
+    if (score >= 750) return "Excellent";
+    if (score >= 650) return "Strong";
+    if (score >= 550) return "Growing";
+    return "Building";
+  };
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-center gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary-100 to-secondary-100">
           <span className="text-xl font-bold text-primary">
             {kid.firstName[0]}
           </span>
@@ -74,9 +91,10 @@ function KidOverviewCard({
             {kid.firstName}
           </h3>
           <div
-            className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium ${getTrustScoreColor(kid.trustScore)}`}
+            className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium ${getTrustScoreColor(kid.trustScore)}`}
           >
-            Trust Score: {kid.trustScore}
+            <span>{getTrustScoreLabel(kid.trustScore)}</span>
+            <span className="opacity-70">({kid.trustScore})</span>
           </div>
         </div>
         <div className="text-right">
@@ -87,26 +105,26 @@ function KidOverviewCard({
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-4 gap-4">
-        <div className="rounded-lg bg-primary-50 p-3">
-          <p className="text-xs font-medium text-primary-700">Spend</p>
-          <p className="mt-1 font-semibold text-primary-900">
+      <div className="mt-6 grid grid-cols-4 gap-3">
+        <div className="rounded-xl bg-bucket-spend/10 p-3">
+          <p className="text-xs font-medium text-bucket-spend">Spend</p>
+          <p className="mt-1 font-semibold text-gray-900">
             {formatCurrency(kid.spendBalance)}
           </p>
         </div>
-        <div className="rounded-lg bg-green-50 p-3">
-          <p className="text-xs font-medium text-green-700">Save</p>
-          <p className="mt-1 font-semibold text-green-900">
+        <div className="rounded-xl bg-bucket-save/10 p-3">
+          <p className="text-xs font-medium text-bucket-save">Save</p>
+          <p className="mt-1 font-semibold text-gray-900">
             {formatCurrency(kid.saveBalance)}
           </p>
         </div>
-        <div className="rounded-lg bg-pink-50 p-3">
-          <p className="text-xs font-medium text-pink-700">Give</p>
-          <p className="mt-1 font-semibold text-pink-900">$0.00</p>
+        <div className="rounded-xl bg-bucket-give/10 p-3">
+          <p className="text-xs font-medium text-bucket-give">Give</p>
+          <p className="mt-1 font-semibold text-gray-900">$0.00</p>
         </div>
-        <div className="rounded-lg bg-amber-50 p-3">
-          <p className="text-xs font-medium text-amber-700">Invest</p>
-          <p className="mt-1 font-semibold text-amber-900">$0.00</p>
+        <div className="rounded-xl bg-bucket-invest/10 p-3">
+          <p className="text-xs font-medium text-bucket-invest">Invest</p>
+          <p className="mt-1 font-semibold text-gray-900">$0.00</p>
         </div>
       </div>
     </div>
@@ -128,9 +146,16 @@ export default function DashboardPage() {
     family ? { familyId: family._id } : "skip"
   );
 
-  const totalBalance = kids?.reduce((sum: number, k: { totalBalance: number }) => sum + k.totalBalance, 0) ?? 0;
+  const totalBalance =
+    kids?.reduce(
+      (sum: number, k: { totalBalance: number }) => sum + k.totalBalance,
+      0
+    ) ?? 0;
   const totalOutstanding =
-    activeLoans?.reduce((sum: number, l: { remainingBalance: number }) => sum + l.remainingBalance, 0) ?? 0;
+    activeLoans?.reduce(
+      (sum: number, l: { remainingBalance: number }) => sum + l.remainingBalance,
+      0
+    ) ?? 0;
 
   return (
     <div>
@@ -148,112 +173,48 @@ export default function DashboardPage() {
         <StatCard
           title="Total Family Balance"
           value={formatCurrency(totalBalance)}
-          icon={
-            <svg
-              className="h-6 w-6 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-bucket-spend-100 to-bucket-invest-100"
+          icon={<BucketIcon size={28} />}
         />
         <StatCard
           title="Active Kids"
           value={String(kids?.length ?? 0)}
-          icon={
-            <svg
-              className="h-6 w-6 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-primary-100 to-secondary-100"
+          icon={<FamilyIcon size={28} />}
         />
         <StatCard
           title="Pending Chores"
           value={String(pendingChores?.length ?? 0)}
-          icon={
-            <svg
-              className="h-6 w-6 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-bucket-spend-100 to-accent-100"
+          icon={<ChoreIcon size={28} />}
         />
         <StatCard
           title="Loans Outstanding"
           value={formatCurrency(totalOutstanding)}
-          icon={
-            <svg
-              className="h-6 w-6 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
+          gradient="bg-gradient-to-br from-primary-100 to-bucket-save-100"
+          icon={<LoanIcon size={28} />}
         />
       </div>
 
       {/* Pending Approvals Alert */}
       {pendingChores && pendingChores.length > 0 && (
-        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-8 rounded-2xl border border-accent-200 bg-gradient-to-r from-accent-50 to-amber-50 p-4 shadow-elevation-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
-              <svg
-                className="h-5 w-5 text-amber-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-100">
+              <ChoreIcon size={24} />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-amber-800">
+              <p className="font-semibold text-accent-800">
                 {pendingChores.length} chore{pendingChores.length > 1 ? "s" : ""}{" "}
                 waiting for your approval
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-accent-700">
                 Review and approve completed chores to release payments.
               </p>
             </div>
             <a
               href="/dashboard/chores"
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-accent-600 hover:shadow-elevation-2"
             >
               Review Now
             </a>
@@ -267,7 +228,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900">Your Kids</h2>
           <a
             href="/dashboard/family"
-            className="text-sm font-medium text-primary hover:text-primary-600"
+            className="text-sm font-semibold text-primary hover:text-primary-600"
           >
             Manage Family →
           </a>
@@ -280,27 +241,17 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-              />
-            </svg>
-            <h3 className="mt-4 font-medium text-gray-900">No kids yet</h3>
+          <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white/50 p-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
+              <FamilyIcon size={32} />
+            </div>
+            <h3 className="mt-4 font-semibold text-gray-900">No kids yet</h3>
             <p className="mt-1 text-sm text-gray-500">
               Add your first child to start their financial journey.
             </p>
             <a
               href="/dashboard/family"
-              className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600"
+              className="mt-4 inline-block rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2"
             >
               Add a Kid
             </a>

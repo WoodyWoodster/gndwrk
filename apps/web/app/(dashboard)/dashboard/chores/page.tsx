@@ -4,16 +4,17 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
+import { ChoreIcon } from "@/components/icons";
 
 type ChoreStatus = "all" | "open" | "claimed" | "pending_approval" | "paid";
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    open: "bg-blue-100 text-blue-700",
-    claimed: "bg-purple-100 text-purple-700",
+    open: "bg-primary-100 text-primary",
+    claimed: "bg-accent-100 text-accent",
     pending_approval: "bg-amber-100 text-amber-700",
-    paid: "bg-green-100 text-green-700",
-    completed: "bg-green-100 text-green-700",
+    paid: "bg-secondary-100 text-secondary",
+    completed: "bg-secondary-100 text-secondary",
   };
 
   const labels: Record<string, string> = {
@@ -26,7 +27,7 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-gray-100 text-gray-700"}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status] ?? "bg-gray-100 text-gray-700"}`}
     >
       {labels[status] ?? status}
     </span>
@@ -73,7 +74,7 @@ function CreateChoreModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-xl bg-white p-6">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-elevation-3">
         <h2 className="text-lg font-semibold text-gray-900">Create New Chore</h2>
         <p className="text-sm text-gray-500">
           Add a new chore for your kids to earn money.
@@ -89,7 +90,7 @@ function CreateChoreModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Clean your room"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               required
             />
           </div>
@@ -103,7 +104,7 @@ function CreateChoreModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What needs to be done..."
               rows={3}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
@@ -119,7 +120,7 @@ function CreateChoreModal({
                 placeholder="5.00"
                 min="0.01"
                 step="0.01"
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 required
               />
             </div>
@@ -133,7 +134,7 @@ function CreateChoreModal({
                 onChange={(e) =>
                   setFrequency(e.target.value as "once" | "daily" | "weekly")
                 }
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="once">One-time</option>
                 <option value="daily">Daily</option>
@@ -146,14 +147,14 @@ function CreateChoreModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
+              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2 disabled:opacity-50"
             >
               {loading ? "Creating..." : "Create Chore"}
             </button>
@@ -190,7 +191,7 @@ function ChoreCard({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-elevation-1 transition-all hover:shadow-elevation-2">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -201,7 +202,7 @@ function ChoreCard({
             <p className="mt-1 text-sm text-gray-500">{chore.description}</p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-            <span className="rounded bg-gray-100 px-2 py-0.5">
+            <span className="rounded-lg bg-gray-100 px-2 py-0.5">
               {frequencyLabels[chore.frequency] ?? chore.frequency}
             </span>
             {chore.assignedToName && (
@@ -221,13 +222,13 @@ function ChoreCard({
         <div className="mt-4 flex gap-2 border-t border-gray-100 pt-4">
           <button
             onClick={onApprove}
-            className="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+            className="flex-1 rounded-xl bg-secondary px-3 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-secondary-600 hover:shadow-elevation-2"
           >
             Approve & Pay
           </button>
           <button
             onClick={onReject}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-xl border border-gray-300 px-3 py-2.5 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50"
           >
             Reject
           </button>
@@ -286,7 +287,7 @@ export default function ChoresPage() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600"
+          className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2"
         >
           <svg
             className="h-5 w-5"
@@ -307,35 +308,23 @@ export default function ChoresPage() {
 
       {/* Pending Approval Alert */}
       {pendingCount && pendingCount > 0 && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-6 rounded-2xl border border-accent-200 bg-gradient-to-r from-accent-50 to-amber-50 p-4 shadow-elevation-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
-              <svg
-                className="h-5 w-5 text-amber-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-100">
+              <ChoreIcon size={24} />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-amber-800">
+              <p className="font-semibold text-accent-800">
                 {pendingCount} chore{pendingCount > 1 ? "s" : ""} waiting for
                 your approval
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-accent-700">
                 Review completed chores to release payments.
               </p>
             </div>
             <button
               onClick={() => setFilter("pending_approval")}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-accent-600 hover:shadow-elevation-2"
             >
               Review
             </button>
@@ -355,9 +344,9 @@ export default function ChoresPage() {
           <button
             key={key}
             onClick={() => setFilter(key as ChoreStatus)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
               filter === key
-                ? "bg-primary text-white"
+                ? "bg-primary text-white shadow-elevation-1"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
@@ -379,21 +368,11 @@ export default function ChoresPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border-2 border-dashed border-gray-300 p-8 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-          <h3 className="mt-4 font-medium text-gray-900">
+        <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white/50 p-8 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
+            <ChoreIcon size={32} />
+          </div>
+          <h3 className="mt-4 font-semibold text-gray-900">
             {filter === "all" ? "No chores yet" : `No ${filter} chores`}
           </h3>
           <p className="mt-1 text-sm text-gray-500">
@@ -404,7 +383,7 @@ export default function ChoresPage() {
           {filter === "all" && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600"
+              className="mt-4 inline-block rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2"
             >
               Create Chore
             </button>
