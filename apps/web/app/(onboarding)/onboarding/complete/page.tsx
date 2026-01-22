@@ -5,6 +5,8 @@ import { useQuery } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
+import { GrowthIllustration } from "@/components/icons/illustrations";
+import { FamilyIcon, ChoreIcon, BucketIcon } from "@/components/icons";
 
 export default function CompletePage() {
   const router = useRouter();
@@ -16,20 +18,23 @@ export default function CompletePage() {
     const duration = 2000;
     const end = Date.now() + duration;
 
+    // Bucket system colors for confetti
+    const bucketColors = ["#F06050", "#38BDF8", "#A78BFA", "#84CC16", "#F59315"];
+
     const frame = () => {
       confetti({
         particleCount: 3,
         angle: 60,
         spread: 55,
         origin: { x: 0 },
-        colors: ["#3B82F6", "#10B981", "#F59E0B"],
+        colors: bucketColors,
       });
       confetti({
         particleCount: 3,
         angle: 120,
         spread: 55,
         origin: { x: 1 },
-        colors: ["#3B82F6", "#10B981", "#F59E0B"],
+        colors: bucketColors,
       });
 
       if (Date.now() < end) {
@@ -58,8 +63,13 @@ export default function CompletePage() {
         showContent ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
       }`}
     >
+      {/* Illustration */}
+      <div className="flex justify-center mb-6">
+        <GrowthIllustration size={140} />
+      </div>
+
       <div className="text-center">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-secondary-100 to-secondary-200">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-secondary-50 shadow-elevation-2">
           <svg className="h-10 w-10 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
@@ -71,24 +81,24 @@ export default function CompletePage() {
       </div>
 
       <div className="mt-8 space-y-4">
-        <div className="rounded-xl bg-gradient-to-br from-primary-50 to-secondary-50 p-4">
+        <div className="rounded-xl bg-gray-50 p-4">
           <h3 className="font-semibold text-gray-900">What's next?</h3>
           <ul className="mt-3 space-y-3 text-sm text-gray-600">
             <li className="flex items-start gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                1
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary">
+                <FamilyIcon size={14} className="[&_*]:fill-white" />
               </span>
               <span>Add your kids to your family using the invite code or creating their profiles</span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                2
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-bucket-spend">
+                <ChoreIcon size={14} className="[&_*]:fill-white" />
               </span>
               <span>Set up allowances and chores to start teaching money management</span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                3
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-bucket-invest">
+                <BucketIcon size={14} className="[&_*]:fill-white" />
               </span>
               <span>Fund accounts and customize spending rules for each child</span>
             </li>

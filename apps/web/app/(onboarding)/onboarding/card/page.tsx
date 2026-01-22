@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { CardIcon, CheckIcon } from "@/components/icons";
 
 export default function CardPage() {
   const router = useRouter();
@@ -66,10 +67,8 @@ export default function CardPage() {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
-          <svg className="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 shadow-elevation-2">
+          <CardIcon size={32} />
         </div>
         <h1 className="mt-4 text-2xl font-bold text-gray-900">Get Your Debit Card</h1>
         <p className="mt-2 text-gray-600">
@@ -85,7 +84,7 @@ export default function CardPage() {
 
       <div className="mt-8 space-y-4">
         {/* Card Preview */}
-        <div className="relative mx-auto aspect-[1.586/1] w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-600 to-secondary p-6 text-white shadow-elevation-3">
+        <div className="relative mx-auto aspect-[1.586/1] w-full max-w-sm overflow-hidden rounded-2xl bg-primary p-6 text-white shadow-elevation-3">
           <div className="absolute inset-0 opacity-10">
             <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
               <circle cx="80" cy="20" r="40" fill="white" />
@@ -114,27 +113,19 @@ export default function CardPage() {
           <h3 className="font-medium text-gray-900">Card features:</h3>
           <ul className="mt-2 space-y-2 text-sm text-gray-600">
             <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-secondary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+              <CheckIcon size={16} />
               Virtual card for online purchases
             </li>
             <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-secondary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+              <CheckIcon size={16} />
               Real-time transaction notifications
             </li>
             <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-secondary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+              <CheckIcon size={16} />
               Spending limits set by parents
             </li>
             <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-secondary" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+              <CheckIcon size={16} />
               Order physical card later
             </li>
           </ul>
@@ -169,11 +160,11 @@ export default function CardPage() {
 
       {/* Progress Indicator */}
       <div className="mt-8 flex justify-center gap-2">
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
+        <div className="h-2 w-8 rounded-full bg-bucket-spend" />
+        <div className="h-2 w-8 rounded-full bg-bucket-save" />
+        <div className="h-2 w-8 rounded-full bg-bucket-give" />
+        <div className="h-2 w-8 rounded-full bg-bucket-invest" />
+        <div className="h-2 w-8 rounded-full bg-secondary" />
       </div>
     </div>
   );

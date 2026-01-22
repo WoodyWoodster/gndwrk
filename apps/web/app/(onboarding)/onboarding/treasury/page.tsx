@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { ConfigureIllustration } from "@/components/icons/illustrations";
+import { BucketIcon } from "@/components/icons";
 
 export default function TreasuryPage() {
   const router = useRouter();
@@ -64,11 +66,14 @@ export default function TreasuryPage() {
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
+      {/* Illustration */}
+      <div className="flex justify-center mb-6">
+        <ConfigureIllustration size={120} />
+      </div>
+
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
-          <svg className="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-bucket-spend-50 shadow-elevation-2">
+          <BucketIcon size={32} />
         </div>
         <h1 className="mt-4 text-2xl font-bold text-gray-900">Set Up Your Account</h1>
         <p className="mt-2 text-gray-600">
@@ -138,10 +143,10 @@ export default function TreasuryPage() {
 
       {/* Progress Indicator */}
       <div className="mt-8 flex justify-center gap-2">
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
+        <div className="h-2 w-8 rounded-full bg-bucket-spend" />
+        <div className="h-2 w-8 rounded-full bg-bucket-save" />
+        <div className="h-2 w-8 rounded-full bg-bucket-give" />
+        <div className="h-2 w-8 rounded-full bg-bucket-invest" />
         <div className="h-2 w-8 rounded-full bg-gray-200" />
       </div>
     </div>

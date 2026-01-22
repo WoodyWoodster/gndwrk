@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { AddKidsIllustration } from "@/components/icons/illustrations";
+import { FamilyIcon } from "@/components/icons";
 
 export default function FamilyPage() {
   const router = useRouter();
@@ -84,11 +86,14 @@ export default function FamilyPage() {
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
+      {/* Illustration */}
+      <div className="flex justify-center mb-6">
+        <AddKidsIllustration size={120} />
+      </div>
+
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
-          <svg className="h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary-50 shadow-elevation-2">
+          <FamilyIcon size={32} />
         </div>
         <h1 className="mt-4 text-2xl font-bold text-gray-900">
           {status?.role === "kid" ? "Join Your Family" : "Set Up Your Family"}
@@ -192,8 +197,8 @@ export default function FamilyPage() {
 
       {/* Progress Indicator */}
       <div className="mt-8 flex justify-center gap-2">
-        <div className="h-2 w-8 rounded-full bg-primary" />
-        <div className="h-2 w-8 rounded-full bg-primary" />
+        <div className="h-2 w-8 rounded-full bg-bucket-spend" />
+        <div className="h-2 w-8 rounded-full bg-bucket-save" />
         <div className="h-2 w-8 rounded-full bg-gray-200" />
         <div className="h-2 w-8 rounded-full bg-gray-200" />
         <div className="h-2 w-8 rounded-full bg-gray-200" />

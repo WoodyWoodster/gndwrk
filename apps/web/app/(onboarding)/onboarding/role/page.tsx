@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { SignUpIllustration } from "@/components/icons/illustrations";
+import { FamilyIcon } from "@/components/icons";
 
 export default function RoleSelectPage() {
   const router = useRouter();
@@ -31,6 +33,11 @@ export default function RoleSelectPage() {
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
+      {/* Illustration */}
+      <div className="flex justify-center mb-6">
+        <SignUpIllustration size={120} />
+      </div>
+
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900">Welcome to Gndwrk</h1>
         <p className="mt-2 text-gray-600">
@@ -46,10 +53,8 @@ export default function RoleSelectPage() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-primary-50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
           <div className="relative">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100">
-              <svg className="h-7 w-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 shadow-elevation-2">
+              <FamilyIcon size={28} />
             </div>
             <h2 className="mt-4 text-xl font-semibold text-gray-900">I'm a Parent</h2>
             <p className="mt-1 text-sm text-gray-600">
@@ -65,9 +70,10 @@ export default function RoleSelectPage() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-secondary-50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
           <div className="relative">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-secondary-100 to-accent-100">
-              <svg className="h-7 w-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary-50 shadow-elevation-2">
+              <svg className="h-7 w-7 text-accent" fill="none" viewBox="0 0 24 24">
+                <circle cx="12" cy="8" r="4" fill="#F59315" />
+                <path d="M6 20c0-4 3-6 6-6s6 2 6 6" fill="#F59315" />
               </svg>
             </div>
             <h2 className="mt-4 text-xl font-semibold text-gray-900">I'm a Kid</h2>
