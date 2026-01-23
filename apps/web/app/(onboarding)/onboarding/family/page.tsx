@@ -38,8 +38,10 @@ export default function FamilyPage() {
     setError(null);
 
     try {
-      await createFamily({ name: familyName.trim() });
-      await updateStep({ step: "plan_select" });
+      await Promise.all([
+        createFamily({ name: familyName.trim() }),
+        updateStep({ step: "plan_select" }),
+      ]);
       router.push("/onboarding/plan");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create family");
@@ -73,21 +75,34 @@ export default function FamilyPage() {
     }
   };
 
-  // Redirect if already has family
+  // Guard: redirect if user already has a family and is past this step.
+  // Only redirect to steps AHEAD of family_create — never during active submission.
+  const familyId = status?.familyId;
+  const role = status?.role;
+  const step = status?.onboardingStep;
+
   useEffect(() => {
-    if (status?.familyId) {
-      if (status.role === "kid") {
-        router.replace("/dashboard");
-      } else {
-        // Redirect based on current onboarding step
-        if (status.onboardingStep === "plan_select") {
-          router.replace("/onboarding/plan");
-        } else {
-          router.replace("/onboarding/kyc");
-        }
-      }
+    if (isSubmitting || !familyId) return;
+    if (role === "kid") {
+      router.replace("/dashboard");
+      return;
     }
-  }, [status, router]);
+    switch (step) {
+      case "plan_select":
+        router.replace("/onboarding/plan");
+        break;
+      case "kyc_verify":
+        router.replace("/onboarding/kyc");
+        break;
+      case "treasury_setup":
+        router.replace("/onboarding/treasury");
+        break;
+      case "complete":
+        router.replace("/dashboard");
+        break;
+      // "family_create" or "role_select" — user belongs here, don't redirect
+    }
+  }, [familyId, role, step, isSubmitting, router]);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">

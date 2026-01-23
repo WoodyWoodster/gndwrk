@@ -88,11 +88,12 @@ export default function PlanSelectPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Redirect kids - they don't select plans
+  const role = status?.role;
   useEffect(() => {
-    if (status?.role === "kid") {
+    if (role === "kid") {
       router.replace("/dashboard");
     }
-  }, [status, router]);
+  }, [role, router]);
 
   const handleSelectPlan = async () => {
     setIsSubmitting(true);

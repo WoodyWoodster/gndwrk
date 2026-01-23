@@ -16,15 +16,15 @@ export default function RoleSelectPage() {
   const handleRoleSelect = async (role: "parent" | "kid") => {
     setIsSubmitting(true);
     try {
-      await setRole({ role });
-
       if (role === "parent") {
-        await updateStep({ step: "family_create" });
-        router.push("/onboarding/family");
+        await Promise.all([
+          setRole({ role }),
+          updateStep({ step: "family_create" }),
+        ]);
       } else {
-        // Kids go directly to join family flow
-        router.push("/onboarding/family");
+        await setRole({ role });
       }
+      router.push("/onboarding/family");
     } catch (error) {
       console.error("Failed to set role:", error);
       setIsSubmitting(false);
