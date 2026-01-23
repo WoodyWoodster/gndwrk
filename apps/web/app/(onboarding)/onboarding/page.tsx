@@ -42,11 +42,17 @@ export default function OnboardingRouter() {
       case "plan_select":
         router.replace("/onboarding/plan");
         break;
+      case "checkout":
+        router.replace("/onboarding/checkout");
+        break;
       case "kyc_verify":
         router.replace("/onboarding/kyc");
         break;
       case "treasury_setup":
         router.replace("/onboarding/treasury");
+        break;
+      case "bank_link":
+        router.replace("/onboarding/bank");
         break;
       default:
         router.replace("/onboarding/role");

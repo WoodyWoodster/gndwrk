@@ -1,61 +1,51 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useEffect } from "react";
+import { useQuery as useConvexQuery, useMutation as useConvexMutation } from "convex/react";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { ConfigureIllustration } from "@/components/icons/illustrations";
 import { BucketIcon } from "@/components/icons";
 
-
 export default function TreasuryPage() {
   const router = useRouter();
-  const status = useQuery(api.onboarding.getStatus);
-  const completeOnboarding = useMutation(api.onboarding.complete);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const status = useConvexQuery(api.onboarding.getStatus);
+  const updateStep = useConvexMutation(api.onboarding.updateStep);
 
   // Redirect if already has treasury account
   useEffect(() => {
     if (status?.stripeTreasuryAccountId) {
-      router.replace("/onboarding/complete");
+      router.replace("/onboarding/bank");
     }
   }, [status, router]);
 
-  const setupTreasury = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/stripe/treasury", {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to set up treasury account");
+  const treasuryMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/stripe/treasury", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error || "Failed to set up treasury account");
       }
+      return res.json();
+    },
+    onSuccess: async () => {
+      await updateStep({ step: "bank_link" });
+      router.push("/onboarding/bank");
+    },
+  });
 
-      // Treasury route handles card creation (if capability is active)
-      // or sets autoCardCreationStatus to "pending" (if not)
-      await completeOnboarding();
-      router.push("/onboarding/complete");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to set up account");
-      setIsLoading(false);
-    }
-  };
+  const skipMutation = useMutation({
+    mutationFn: async () => {
+      await updateStep({ step: "bank_link" });
+    },
+    onSuccess: () => {
+      router.push("/onboarding/bank");
+    },
+  });
 
-  const skipTreasury = async () => {
-    setIsLoading(true);
-    try {
-      await completeOnboarding();
-      router.push("/onboarding/complete");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to skip");
-      setIsLoading(false);
-    }
-  };
+  const isProcessing = treasuryMutation.isPending || skipMutation.isPending;
+  const error = treasuryMutation.error?.message || skipMutation.error?.message;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
@@ -104,11 +94,11 @@ export default function TreasuryPage() {
         </div>
 
         <button
-          onClick={setupTreasury}
-          disabled={isLoading}
+          onClick={() => treasuryMutation.mutate()}
+          disabled={isProcessing}
           className="w-full rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-primary-600 hover:shadow-elevation-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isLoading ? (
+          {treasuryMutation.isPending ? (
             <span className="flex items-center justify-center gap-2">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               Setting up account...
@@ -121,8 +111,8 @@ export default function TreasuryPage() {
         {/* Skip button for development */}
         {process.env.NODE_ENV === "development" && (
           <button
-            onClick={skipTreasury}
-            disabled={isLoading}
+            onClick={() => skipMutation.mutate()}
+            disabled={isProcessing}
             className="w-full rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Skip (Development Only)

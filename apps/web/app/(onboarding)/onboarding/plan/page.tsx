@@ -101,7 +101,7 @@ export default function PlanSelectPage() {
 
     try {
       await selectPlan({ tier: selectedTier });
-      router.push("/onboarding/kyc");
+      router.push(selectedTier === "starter" ? "/onboarding/kyc" : "/onboarding/checkout");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to select plan");
       setIsSubmitting(false);

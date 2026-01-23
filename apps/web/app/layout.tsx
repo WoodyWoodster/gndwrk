@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ConvexClientProvider } from "@/components/convex-provider";
+import { QueryProvider } from "@/components/query-provider";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -237,7 +238,9 @@ export default function RootLayout({
         <body
           className={`${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         >
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <ConvexClientProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </ConvexClientProvider>
         </body>
       </html>
     </ClerkProvider>

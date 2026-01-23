@@ -7,8 +7,10 @@ const onboardingStepValidator = v.union(
   v.literal("role_select"),
   v.literal("family_create"),
   v.literal("plan_select"),
+  v.literal("checkout"),
   v.literal("kyc_verify"),
   v.literal("treasury_setup"),
+  v.literal("bank_link"),
   v.literal("complete")
 );
 
@@ -63,6 +65,7 @@ export const getStatus = query({
       isComplete,
       selectedTier: onboardingSession?.selectedTier,
       personalInfo: onboardingSession?.personalInfo,
+      stripeSubscriptionId: onboardingSession?.stripeSubscriptionId,
       stripeCustomerId: stripeIdentity?.stripeCustomerId,
       stripeConnectAccountId: stripeIdentity?.stripeConnectAccountId,
       stripeIdentitySessionId: kycVerification?.stripeIdentitySessionId,
@@ -210,9 +213,55 @@ export const selectPlan = mutation({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .unique();
 
+    const nextStep = tier === "starter" ? "kyc_verify" : "checkout";
+
     if (existingSession) {
       await ctx.db.patch(existingSession._id, {
         selectedTier: tier,
+        currentStep: nextStep,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("onboardingSessions", {
+        userId: user._id,
+        currentStep: nextStep,
+        selectedTier: tier,
+        status: "in_progress",
+        startedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return user._id;
+  },
+});
+
+// Store subscription ID after checkout and advance to KYC
+export const storeCheckoutSubscription = mutation({
+  args: {
+    stripeSubscriptionId: v.string(),
+  },
+  handler: async (ctx, { stripeSubscriptionId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const now = Date.now();
+
+    const existingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.patch(existingSession._id, {
+        stripeSubscriptionId,
         currentStep: "kyc_verify",
         updatedAt: now,
       });
@@ -220,9 +269,73 @@ export const selectPlan = mutation({
       await ctx.db.insert("onboardingSessions", {
         userId: user._id,
         currentStep: "kyc_verify",
-        selectedTier: tier,
+        stripeSubscriptionId,
         status: "in_progress",
         startedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return user._id;
+  },
+});
+
+// Store linked bank account from Financial Connections
+export const storeBankLink = mutation({
+  args: {
+    stripeFinancialConnectionsAccountId: v.string(),
+    institutionName: v.string(),
+    accountLast4: v.string(),
+    accountType: v.optional(v.union(
+      v.literal("checking"),
+      v.literal("savings"),
+      v.literal("other")
+    )),
+    stripeBankAccountId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+    if (!user.familyId) throw new Error("User must have a family");
+
+    const now = Date.now();
+
+    // Check if this FC account already exists
+    const existing = await ctx.db
+      .query("linkedBankAccounts")
+      .withIndex("by_fc_account", (q) =>
+        q.eq("stripeFinancialConnectionsAccountId", args.stripeFinancialConnectionsAccountId)
+      )
+      .unique();
+
+    if (existing) {
+      // Update existing record
+      await ctx.db.patch(existing._id, {
+        institutionName: args.institutionName,
+        accountLast4: args.accountLast4,
+        accountType: args.accountType,
+        stripeBankAccountId: args.stripeBankAccountId,
+        status: "active",
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("linkedBankAccounts", {
+        userId: user._id,
+        familyId: user.familyId,
+        stripeFinancialConnectionsAccountId: args.stripeFinancialConnectionsAccountId,
+        institutionName: args.institutionName,
+        accountLast4: args.accountLast4,
+        accountType: args.accountType,
+        stripeBankAccountId: args.stripeBankAccountId,
+        status: "active",
+        createdAt: now,
         updatedAt: now,
       });
     }

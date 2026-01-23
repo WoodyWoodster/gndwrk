@@ -425,8 +425,10 @@ export default defineSchema({
       v.literal("role_select"),
       v.literal("family_create"),
       v.literal("plan_select"),
+      v.literal("checkout"),
       v.literal("kyc_verify"),
       v.literal("treasury_setup"),
+      v.literal("bank_link"),
       v.literal("complete")
     ),
     status: v.union(
@@ -440,6 +442,8 @@ export default defineSchema({
       v.literal("family"),
       v.literal("familyplus")
     )),
+    // Stripe subscription ID (for paid plans, created during checkout step)
+    stripeSubscriptionId: v.optional(v.string()),
     // Personal info for Connect account (collected during KYC)
     personalInfo: v.optional(v.object({
       dateOfBirth: v.object({
@@ -462,6 +466,27 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"]),
+
+  // Linked bank accounts via Financial Connections
+  linkedBankAccounts: defineTable({
+    userId: v.id("users"),
+    familyId: v.id("families"),
+    stripeFinancialConnectionsAccountId: v.string(),
+    institutionName: v.string(),
+    accountLast4: v.string(),
+    accountType: v.optional(v.union(
+      v.literal("checking"),
+      v.literal("savings"),
+      v.literal("other")
+    )),
+    status: v.union(v.literal("active"), v.literal("disconnected"), v.literal("error")),
+    stripeBankAccountId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_family", ["familyId"])
+    .index("by_fc_account", ["stripeFinancialConnectionsAccountId"]),
 
   // Explicit family membership junction table
   familyMembers: defineTable({
