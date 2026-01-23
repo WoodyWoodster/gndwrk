@@ -7,18 +7,18 @@ import { useRouter } from "next/navigation";
 import { ConfigureIllustration } from "@/components/icons/illustrations";
 import { BucketIcon } from "@/components/icons";
 
+
 export default function TreasuryPage() {
   const router = useRouter();
   const status = useQuery(api.onboarding.getStatus);
-  const updateStep = useMutation(api.onboarding.updateStep);
-  const storeStripeIds = useMutation(api.onboarding.storeStripeIds);
+  const completeOnboarding = useMutation(api.onboarding.complete);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Redirect if already has treasury account
   useEffect(() => {
     if (status?.stripeTreasuryAccountId) {
-      router.replace("/onboarding/card");
+      router.replace("/onboarding/complete");
     }
   }, [status, router]);
 
@@ -36,16 +36,10 @@ export default function TreasuryPage() {
         throw new Error(data.error || "Failed to set up treasury account");
       }
 
-      const { financialAccountId } = await response.json();
-
-      // Store the treasury account ID
-      await storeStripeIds({
-        stripeTreasuryAccountId: financialAccountId,
-      });
-
-      // Move to next step
-      await updateStep({ step: "card_setup" });
-      router.push("/onboarding/card");
+      // Treasury route handles card creation (if capability is active)
+      // or sets autoCardCreationStatus to "pending" (if not)
+      await completeOnboarding();
+      router.push("/onboarding/complete");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to set up account");
       setIsLoading(false);
@@ -53,11 +47,10 @@ export default function TreasuryPage() {
   };
 
   const skipTreasury = async () => {
-    // For development/testing - skip Treasury setup
     setIsLoading(true);
     try {
-      await updateStep({ step: "card_setup" });
-      router.push("/onboarding/card");
+      await completeOnboarding();
+      router.push("/onboarding/complete");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to skip");
       setIsLoading(false);

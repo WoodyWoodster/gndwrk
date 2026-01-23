@@ -46,9 +46,10 @@ export default function CompletePage() {
     setShowContent(true);
   }, []);
 
-  // Redirect if not complete
+  // Redirect if not complete - guard against race condition
+  // Don't redirect if coming from treasury_setup (the natural previous step)
   useEffect(() => {
-    if (status && status.onboardingStep !== "complete") {
+    if (status && status.onboardingStep !== "complete" && status.onboardingStep !== "treasury_setup") {
       router.replace("/onboarding");
     }
   }, [status, router]);

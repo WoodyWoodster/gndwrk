@@ -63,13 +63,9 @@ const issuingCardData = v.object({
   status: v.optional(v.string()),
 });
 
-const issuingCardholderData = v.object({
-  id: v.string(),
-  email: v.optional(v.string()),
-  name: v.optional(v.string()),
-  metadata: v.optional(v.any()),
-  status: v.optional(v.string()),
-});
+// Use v.any() since Stripe sends many fields (billing, individual, etc.)
+// and we only need a few of them
+const issuingCardholderData = v.any();
 
 const identityVerificationData = v.object({
   id: v.string(),
@@ -153,6 +149,16 @@ async function findUserByStripeCustomerId(ctx: any, customerId: string) {
 async function findStripeIdentityByCardId(ctx: any, cardId: string) {
   const stripeIdentities = await ctx.db.query("stripeIdentities").collect();
   return stripeIdentities.find((si: any) => si.stripeIssuingCardId === cardId);
+}
+
+// Helper to find stripeIdentity by Connect account ID
+async function findStripeIdentityByConnectAccount(ctx: any, connectAccountId: string) {
+  return await ctx.db
+    .query("stripeIdentities")
+    .withIndex("by_connect_account", (q: any) =>
+      q.eq("stripeConnectAccountId", connectAccountId)
+    )
+    .unique();
 }
 
 // Helper to find stripeIdentity by treasury account ID
@@ -1221,5 +1227,76 @@ export const handleInvoicePaymentFailed = mutation({
       "Amount due:",
       data.amount_due
     );
+  },
+});
+
+// ============================================
+// Account capability events
+// ============================================
+
+// Handle account.updated - tracks capability status changes
+export const handleAccountUpdated = mutation({
+  args: {
+    connectAccountId: v.string(),
+    capabilities: v.object({
+      cardIssuing: v.optional(v.union(
+        v.literal("inactive"), v.literal("pending"),
+        v.literal("active"), v.literal("restricted")
+      )),
+      treasury: v.optional(v.union(
+        v.literal("inactive"), v.literal("pending"),
+        v.literal("active"), v.literal("restricted")
+      )),
+    }),
+    eventId: v.optional(v.string()),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, { connectAccountId, capabilities, eventId, eventType }) => {
+    if (eventId && eventType) {
+      const shouldProcess = await checkAndRecordEvent(ctx, eventId, eventType);
+      if (!shouldProcess) return null;
+    }
+
+    const stripeIdentity = await findStripeIdentityByConnectAccount(ctx, connectAccountId);
+    if (!stripeIdentity) {
+      console.log("StripeIdentity not found for connect account:", connectAccountId);
+      return null;
+    }
+
+    const now = Date.now();
+    const previousCapabilities = stripeIdentity.capabilities;
+
+    await ctx.db.patch(stripeIdentity._id, {
+      capabilities,
+      updatedAt: now,
+    });
+
+    // Check if card_issuing just became active and user requested auto-creation
+    const cardIssuingBecameActive =
+      capabilities.cardIssuing === "active" &&
+      previousCapabilities?.cardIssuing !== "active";
+
+    const shouldAutoCreateCard =
+      cardIssuingBecameActive &&
+      stripeIdentity.autoCardCreationStatus === "pending" &&
+      !stripeIdentity.stripeIssuingCardId;
+
+    console.log(
+      "Account updated:", connectAccountId,
+      "card_issuing:", capabilities.cardIssuing,
+      "treasury:", capabilities.treasury,
+      "shouldAutoCreateCard:", shouldAutoCreateCard
+    );
+
+    if (shouldAutoCreateCard) {
+      return {
+        shouldAutoCreateCard: true,
+        userId: stripeIdentity.userId,
+        connectAccountId: stripeIdentity.stripeConnectAccountId,
+        treasuryAccountId: stripeIdentity.stripeTreasuryAccountId,
+      };
+    }
+
+    return null;
   },
 });

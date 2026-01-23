@@ -5,10 +5,17 @@ import { mutation, query } from "./_generated/server";
 const onboardingStepValidator = v.union(
   v.literal("role_select"),
   v.literal("family_create"),
+  v.literal("plan_select"),
   v.literal("kyc_verify"),
   v.literal("treasury_setup"),
-  v.literal("card_setup"),
   v.literal("complete")
+);
+
+// Tier type
+const tierValidator = v.union(
+  v.literal("starter"),
+  v.literal("family"),
+  v.literal("familyplus")
 );
 
 // Get current user's onboarding status
@@ -53,13 +60,77 @@ export const getStatus = query({
       familyId: user.familyId,
       onboardingStep: currentStep,
       isComplete,
+      selectedTier: onboardingSession?.selectedTier,
+      personalInfo: onboardingSession?.personalInfo,
       stripeCustomerId: stripeIdentity?.stripeCustomerId,
       stripeConnectAccountId: stripeIdentity?.stripeConnectAccountId,
       stripeIdentitySessionId: kycVerification?.stripeIdentitySessionId,
       stripeTreasuryAccountId: stripeIdentity?.stripeTreasuryAccountId,
       stripeCardholderId: stripeIdentity?.stripeCardholderId,
+      stripeIssuingCardId: stripeIdentity?.stripeIssuingCardId,
       kycStatus: kycVerification?.status,
+      capabilities: stripeIdentity?.capabilities,
+      autoCardCreationStatus: stripeIdentity?.autoCardCreationStatus,
     };
+  },
+});
+
+// Get onboarding status by user ID (for webhook/internal use without auth)
+export const getStatusByUserId = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const onboardingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    return {
+      userId: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      personalInfo: onboardingSession?.personalInfo,
+      stripeConnectAccountId: stripeIdentity?.stripeConnectAccountId,
+      stripeTreasuryAccountId: stripeIdentity?.stripeTreasuryAccountId,
+    };
+  },
+});
+
+// Store Stripe IDs for a specific user (for webhook/internal use without auth)
+export const storeStripeIdsForUser = mutation({
+  args: {
+    userId: v.id("users"),
+    stripeCardholderId: v.optional(v.string()),
+    stripeIssuingCardId: v.optional(v.string()),
+    autoCardCreationStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed")
+    )),
+  },
+  handler: async (ctx, { userId, ...args }) => {
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!stripeIdentity) throw new Error("Stripe identity not found for user");
+
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
+    if (args.stripeCardholderId) updates.stripeCardholderId = args.stripeCardholderId;
+    if (args.stripeIssuingCardId) updates.stripeIssuingCardId = args.stripeIssuingCardId;
+    if (args.autoCardCreationStatus) updates.autoCardCreationStatus = args.autoCardCreationStatus;
+
+    await ctx.db.patch(stripeIdentity._id, updates);
+    return userId;
   },
 });
 
@@ -106,6 +177,119 @@ export const updateStep = mutation({
         status: step === "complete" ? "completed" : "in_progress",
         startedAt: now,
         completedAt: step === "complete" ? now : undefined,
+        updatedAt: now,
+      });
+    }
+
+    return user._id;
+  },
+});
+
+// Select a subscription tier during onboarding
+export const selectPlan = mutation({
+  args: {
+    tier: tierValidator,
+  },
+  handler: async (ctx, { tier }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const now = Date.now();
+
+    // Find existing session or create one
+    const existingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.patch(existingSession._id, {
+        selectedTier: tier,
+        currentStep: "kyc_verify",
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("onboardingSessions", {
+        userId: user._id,
+        currentStep: "kyc_verify",
+        selectedTier: tier,
+        status: "in_progress",
+        startedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return user._id;
+  },
+});
+
+// Store personal info for Connect account verification
+export const storePersonalInfo = mutation({
+  args: {
+    dateOfBirth: v.object({
+      day: v.number(),
+      month: v.number(),
+      year: v.number(),
+    }),
+    ssn: v.string(),
+    phone: v.string(),
+    address: v.object({
+      line1: v.string(),
+      line2: v.optional(v.string()),
+      city: v.string(),
+      state: v.string(),
+      postalCode: v.string(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const now = Date.now();
+
+    // Find existing session
+    const existingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.patch(existingSession._id, {
+        personalInfo: {
+          dateOfBirth: args.dateOfBirth,
+          ssn: args.ssn,
+          phone: args.phone,
+          address: args.address,
+        },
+        currentStep: "treasury_setup",
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("onboardingSessions", {
+        userId: user._id,
+        currentStep: "treasury_setup",
+        personalInfo: {
+          dateOfBirth: args.dateOfBirth,
+          ssn: args.ssn,
+          phone: args.phone,
+          address: args.address,
+        },
+        status: "in_progress",
+        startedAt: now,
         updatedAt: now,
       });
     }
@@ -205,6 +389,77 @@ export const storeStripeIds = mutation({
   },
 });
 
+// Update capability status on stripeIdentities
+export const updateCapabilities = mutation({
+  args: {
+    capabilities: v.object({
+      cardIssuing: v.optional(v.union(
+        v.literal("inactive"), v.literal("pending"),
+        v.literal("active"), v.literal("restricted")
+      )),
+      treasury: v.optional(v.union(
+        v.literal("inactive"), v.literal("pending"),
+        v.literal("active"), v.literal("restricted")
+      )),
+    }),
+  },
+  handler: async (ctx, { capabilities }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (!stripeIdentity) throw new Error("Stripe identity not found");
+
+    await ctx.db.patch(stripeIdentity._id, {
+      capabilities,
+      updatedAt: Date.now(),
+    });
+
+    return user._id;
+  },
+});
+
+// Request auto card creation when user leaves card page while capability is pending
+export const requestAutoCardCreation = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const stripeIdentity = await ctx.db
+      .query("stripeIdentities")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (!stripeIdentity) throw new Error("Stripe identity not found");
+
+    await ctx.db.patch(stripeIdentity._id, {
+      autoCardCreationStatus: "pending",
+      updatedAt: Date.now(),
+    });
+
+    return user._id;
+  },
+});
+
 // Complete onboarding - creates accounts for parent
 export const complete = mutation({
   args: {},
@@ -222,15 +477,28 @@ export const complete = mutation({
 
     const now = Date.now();
 
+    // Get onboarding session to check selected tier
+    const onboardingSession = await ctx.db
+      .query("onboardingSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    const selectedTier = onboardingSession?.selectedTier ?? "family";
+
     // Check if accounts already exist
     const existingAccounts = await ctx.db
       .query("accounts")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    // Create 4 bucket accounts for parent if they don't exist
+    // Create bucket accounts based on selected tier
+    // Starter: only 2 buckets (spend, save)
+    // Family/Family+: all 4 buckets
     if (existingAccounts.length === 0) {
-      const bucketTypes = ["spend", "save", "give", "invest"] as const;
+      const bucketTypes = selectedTier === "starter"
+        ? (["spend", "save"] as const)
+        : (["spend", "save", "give", "invest"] as const);
+
       for (const type of bucketTypes) {
         await ctx.db.insert("accounts", {
           userId: user._id,
@@ -244,13 +512,8 @@ export const complete = mutation({
     }
 
     // Mark onboarding as complete
-    const existingSession = await ctx.db
-      .query("onboardingSessions")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .unique();
-
-    if (existingSession) {
-      await ctx.db.patch(existingSession._id, {
+    if (onboardingSession) {
+      await ctx.db.patch(onboardingSession._id, {
         currentStep: "complete",
         status: "completed",
         completedAt: now,

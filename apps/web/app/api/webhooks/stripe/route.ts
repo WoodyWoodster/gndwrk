@@ -4,6 +4,8 @@ import type Stripe from "stripe";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@gndwrk/convex/_generated/api";
 import { stripe, getWebhookSecret } from "@/lib/stripe";
+import { resend } from "@/lib/resend";
+import CardReadyEmail from "@/emails/card-ready";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -79,6 +81,137 @@ export async function POST(req: Request) {
           ...eventMeta,
         });
         break;
+
+      // ============================================
+      // Account capability events
+      // ============================================
+      case "account.updated": {
+        const account = event.data.object as Stripe.Account;
+        const connectAccountId = account.id;
+
+        // Map Stripe capability statuses to our enum
+        const mapCapability = (status: string | undefined) => {
+          if (status === "active") return "active" as const;
+          if (status === "pending") return "pending" as const;
+          if (status === "restricted") return "restricted" as const;
+          return "inactive" as const;
+        };
+
+        const result = await convex.mutation(api.stripe.handleAccountUpdated, {
+          connectAccountId,
+          capabilities: {
+            cardIssuing: mapCapability(account.capabilities?.card_issuing),
+            treasury: mapCapability(account.capabilities?.treasury),
+          },
+          ...eventMeta,
+        });
+
+        // Auto-create card if capability just activated and user is waiting
+        if (result?.shouldAutoCreateCard && result.connectAccountId && result.treasuryAccountId) {
+          try {
+            // Get user data for cardholder billing info
+            const user = await convex.query(api.users.getById, { userId: result.userId });
+            if (user) {
+              // Get onboarding session for personal info
+              const stripeIdentity = await convex.query(api.onboarding.getStatusByUserId, { userId: result.userId });
+              const personalInfo = stripeIdentity?.personalInfo;
+
+              if (personalInfo) {
+                // Create cardholder
+                const cardholder = await stripe.issuing.cardholders.create(
+                  {
+                    name: `${user.firstName} ${user.lastName || ""}`.trim(),
+                    email: user.email,
+                    type: "individual",
+                    individual: {
+                      first_name: user.firstName,
+                      last_name: user.lastName || "",
+                      card_issuing: {
+                        user_terms_acceptance: {
+                          date: Math.floor(Date.now() / 1000),
+                          ip: "0.0.0.0", // Webhook context, no user IP
+                        },
+                      },
+                    },
+                    billing: {
+                      address: {
+                        line1: personalInfo.address.line1,
+                        line2: personalInfo.address.line2 || undefined,
+                        city: personalInfo.address.city,
+                        state: personalInfo.address.state,
+                        postal_code: personalInfo.address.postalCode,
+                        country: "US",
+                      },
+                    },
+                    metadata: {
+                      convexId: result.userId,
+                    },
+                  },
+                  { stripeAccount: result.connectAccountId }
+                );
+
+                // Create card
+                const card = await stripe.issuing.cards.create(
+                  {
+                    cardholder: cardholder.id,
+                    financial_account: result.treasuryAccountId,
+                    currency: "usd",
+                    type: "virtual",
+                    status: "active",
+                    spending_controls: {
+                      spending_limits: [
+                        { amount: 50000, interval: "daily" },
+                        { amount: 200000, interval: "monthly" },
+                      ],
+                    },
+                    metadata: {
+                      userId: result.userId,
+                      bucketType: "spend",
+                    },
+                  },
+                  { stripeAccount: result.connectAccountId }
+                );
+
+                // Store IDs in Convex via internal mutation
+                await convex.mutation(api.onboarding.storeStripeIdsForUser, {
+                  userId: result.userId,
+                  stripeCardholderId: cardholder.id,
+                  stripeIssuingCardId: card.id,
+                  autoCardCreationStatus: "completed",
+                });
+
+                console.log("Auto-created card:", card.id, "for user:", result.userId);
+
+                // Send card-ready email notification
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://gndwrk.com";
+                try {
+                  await resend.emails.send({
+                    from: "Gndwrk <noreply@gndwrk.com>",
+                    to: user.email,
+                    subject: "Your Gndwrk debit card is ready!",
+                    react: CardReadyEmail({
+                      firstName: user.firstName,
+                      dashboardUrl: `${appUrl}/dashboard`,
+                    }),
+                  });
+                  console.log("Card-ready email sent to:", user.email);
+                } catch (emailErr) {
+                  // Email failure is non-critical
+                  console.error("Failed to send card-ready email:", emailErr);
+                }
+              }
+            }
+          } catch (cardError) {
+            console.error("Auto-card creation failed:", cardError);
+            // Mark as failed
+            await convex.mutation(api.onboarding.storeStripeIdsForUser, {
+              userId: result.userId,
+              autoCardCreationStatus: "failed",
+            });
+          }
+        }
+        break;
+      }
 
       // ============================================
       // Issuing events

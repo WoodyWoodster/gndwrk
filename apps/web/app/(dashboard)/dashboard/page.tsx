@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { formatCurrency } from "@/lib/utils";
@@ -8,6 +9,7 @@ import {
   FamilyIcon,
   ChoreIcon,
   LoanIcon,
+  CardIcon,
 } from "@/components/icons";
 
 function StatCard({
@@ -133,6 +135,7 @@ function KidOverviewCard({
 
 export default function DashboardPage() {
   const family = useQuery(api.families.getMyFamily);
+  const onboardingStatus = useQuery(api.onboarding.getStatus);
   const kids = useQuery(
     api.users.getFamilyKids,
     family ? { familyId: family._id } : "skip"
@@ -145,6 +148,23 @@ export default function DashboardPage() {
     api.loans.getActiveLoans,
     family ? { familyId: family._id } : "skip"
   );
+
+  const [cardBannerDismissed, setCardBannerDismissed] = useState(true);
+
+  useEffect(() => {
+    setCardBannerDismissed(
+      localStorage.getItem("gndwrk_card_banner_dismissed") === "true"
+    );
+  }, []);
+
+  const showCardBanner =
+    !cardBannerDismissed &&
+    onboardingStatus?.autoCardCreationStatus === "completed";
+
+  const dismissCardBanner = () => {
+    localStorage.setItem("gndwrk_card_banner_dismissed", "true");
+    setCardBannerDismissed(true);
+  };
 
   const validKids = kids?.filter((k): k is NonNullable<typeof k> => k !== null) ?? [];
   const totalBalance = validKids.reduce(
@@ -167,6 +187,40 @@ export default function DashboardPage() {
           Here's what's happening with your family's finances.
         </p>
       </div>
+
+      {/* Card Ready Banner */}
+      {showCardBanner && (
+        <div className="mb-8 rounded-2xl border border-secondary-200 bg-gradient-to-r from-secondary-50 to-primary-50 p-4 shadow-elevation-1">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary-100">
+              <CardIcon size={24} />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-secondary-800">
+                Your debit card is ready!
+              </p>
+              <p className="text-sm text-secondary-700">
+                Your identity verification completed and your virtual card has been created.
+              </p>
+            </div>
+            <a
+              href="/dashboard/settings"
+              className="rounded-xl bg-secondary px-5 py-2.5 text-sm font-semibold text-white shadow-elevation-1 transition-all hover:bg-secondary-600 hover:shadow-elevation-2"
+            >
+              View Card
+            </a>
+            <button
+              onClick={dismissCardBanner}
+              className="ml-2 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Dismiss"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">

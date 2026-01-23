@@ -294,11 +294,27 @@ export default defineSchema({
     stripeTreasuryAccountId: v.optional(v.string()),
     stripeCardholderId: v.optional(v.string()),
     stripeIssuingCardId: v.optional(v.string()),
+    capabilities: v.optional(v.object({
+      cardIssuing: v.optional(v.union(
+        v.literal("inactive"), v.literal("pending"),
+        v.literal("active"), v.literal("restricted")
+      )),
+      treasury: v.optional(v.union(
+        v.literal("inactive"), v.literal("pending"),
+        v.literal("active"), v.literal("restricted")
+      )),
+    })),
+    autoCardCreationStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed")
+    )),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_customer_id", ["stripeCustomerId"])
+    .index("by_connect_account", ["stripeConnectAccountId"])
     .index("by_treasury_account", ["stripeTreasuryAccountId"]),
 
   // Subscriptions separate from user identity
@@ -350,9 +366,9 @@ export default defineSchema({
     currentStep: v.union(
       v.literal("role_select"),
       v.literal("family_create"),
+      v.literal("plan_select"),
       v.literal("kyc_verify"),
       v.literal("treasury_setup"),
-      v.literal("card_setup"),
       v.literal("complete")
     ),
     status: v.union(
@@ -360,6 +376,29 @@ export default defineSchema({
       v.literal("completed"),
       v.literal("abandoned")
     ),
+    // Selected tier for the family subscription
+    selectedTier: v.optional(v.union(
+      v.literal("starter"),
+      v.literal("family"),
+      v.literal("familyplus")
+    )),
+    // Personal info for Connect account (collected during KYC)
+    personalInfo: v.optional(v.object({
+      dateOfBirth: v.object({
+        day: v.number(),
+        month: v.number(),
+        year: v.number(),
+      }),
+      ssn: v.string(), // Full SSN - handle securely
+      phone: v.optional(v.string()), // US phone number
+      address: v.object({
+        line1: v.string(),
+        line2: v.optional(v.string()),
+        city: v.string(),
+        state: v.string(),
+        postalCode: v.string(),
+      }),
+    })),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
     updatedAt: v.number(),

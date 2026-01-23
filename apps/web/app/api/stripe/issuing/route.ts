@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { stripe } from "@/lib/stripe";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@gndwrk/convex/_generated/api";
@@ -12,6 +13,11 @@ export async function POST(req: Request) {
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Get user's IP address for terms acceptance
+    const headersList = await headers();
+    const forwardedFor = headersList.get("x-forwarded-for");
+    const userIp = forwardedFor?.split(",")[0]?.trim() || "127.0.0.1";
 
     // Get user and stripe data from Convex
     const clerkToken = await auth().then((a) => a.getToken({ template: "convex" }));
@@ -26,11 +32,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Ensure user has a Connect account
+    // Ensure user has a Connect account and Treasury financial account
     const connectAccountId = onboardingStatus?.stripeConnectAccountId;
+    const treasuryAccountId = onboardingStatus?.stripeTreasuryAccountId;
+
     if (!connectAccountId) {
       return NextResponse.json(
+        { error: "Connect account required before card creation" },
+        { status: 400 }
+      );
+    }
+
+    if (!treasuryAccountId) {
+      return NextResponse.json(
         { error: "Treasury account required before card creation" },
+        { status: 400 }
+      );
+    }
+
+    // Check if card_issuing capability is active
+    const connectAccount = await stripe.accounts.retrieve(connectAccountId);
+    const cardIssuingCapability = connectAccount.capabilities?.card_issuing;
+
+    if (cardIssuingCapability !== "active") {
+      console.log("Card issuing capability status:", cardIssuingCapability);
+      console.log("Account requirements:", connectAccount.requirements);
+
+      return NextResponse.json(
+        {
+          status: "capability_pending",
+          capabilityStatus: cardIssuingCapability || "inactive",
+          requirements: connectAccount.requirements?.currently_due,
+        },
+        { status: 202 }
+      );
+    }
+
+    // Get personal info for billing address
+    const personalInfo = onboardingStatus?.personalInfo;
+    if (!personalInfo) {
+      return NextResponse.json(
+        { error: "Personal information required. Please complete KYC verification first." },
         { status: 400 }
       );
     }
@@ -39,7 +81,7 @@ export async function POST(req: Request) {
     let cardholderId = onboardingStatus?.stripeCardholderId;
 
     if (!cardholderId) {
-      // Create a cardholder
+      // Create a cardholder with terms acceptance
       const cardholder = await stripe.issuing.cardholders.create(
         {
           name: `${user.firstName} ${user.lastName || ""}`.trim(),
@@ -48,13 +90,20 @@ export async function POST(req: Request) {
           individual: {
             first_name: user.firstName,
             last_name: user.lastName || "",
+            card_issuing: {
+              user_terms_acceptance: {
+                date: Math.floor(Date.now() / 1000), // Unix timestamp
+                ip: userIp,
+              },
+            },
           },
           billing: {
             address: {
-              line1: "123 Main Street", // Placeholder - should be collected during onboarding
-              city: "San Francisco",
-              state: "CA",
-              postal_code: "94102",
+              line1: personalInfo.address.line1,
+              line2: personalInfo.address.line2 || undefined,
+              city: personalInfo.address.city,
+              state: personalInfo.address.state,
+              postal_code: personalInfo.address.postalCode,
               country: "US",
             },
           },
@@ -74,6 +123,30 @@ export async function POST(req: Request) {
       await convex.mutation(api.onboarding.storeStripeIds, {
         stripeCardholderId: cardholderId,
       });
+    } else {
+      // Existing cardholder - check if they need terms acceptance update
+      const existingCardholder = await stripe.issuing.cardholders.retrieve(
+        cardholderId,
+        { stripeAccount: connectAccountId }
+      );
+
+      // If cardholder has outstanding requirements, update with terms acceptance
+      if (existingCardholder.requirements?.past_due?.length) {
+        await stripe.issuing.cardholders.update(
+          cardholderId,
+          {
+            individual: {
+              card_issuing: {
+                user_terms_acceptance: {
+                  date: Math.floor(Date.now() / 1000),
+                  ip: userIp,
+                },
+              },
+            },
+          },
+          { stripeAccount: connectAccountId }
+        );
+      }
     }
 
     // Create a virtual card with spending limits
@@ -81,6 +154,7 @@ export async function POST(req: Request) {
     const card = await stripe.issuing.cards.create(
       {
         cardholder: cardholderId,
+        financial_account: treasuryAccountId, // Required: links card to Treasury for funding
         currency: "usd",
         type: "virtual",
         status: "active",

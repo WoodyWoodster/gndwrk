@@ -39,14 +39,14 @@ export default function OnboardingRouter() {
       case "family_create":
         router.replace("/onboarding/family");
         break;
+      case "plan_select":
+        router.replace("/onboarding/plan");
+        break;
       case "kyc_verify":
         router.replace("/onboarding/kyc");
         break;
       case "treasury_setup":
         router.replace("/onboarding/treasury");
-        break;
-      case "card_setup":
-        router.replace("/onboarding/card");
         break;
       default:
         router.replace("/onboarding/role");

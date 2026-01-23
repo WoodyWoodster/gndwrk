@@ -39,8 +39,8 @@ export default function FamilyPage() {
 
     try {
       await createFamily({ name: familyName.trim() });
-      await updateStep({ step: "kyc_verify" });
-      router.push("/onboarding/kyc");
+      await updateStep({ step: "plan_select" });
+      router.push("/onboarding/plan");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create family");
       setIsSubmitting(false);
@@ -79,7 +79,12 @@ export default function FamilyPage() {
       if (status.role === "kid") {
         router.replace("/dashboard");
       } else {
-        router.replace("/onboarding/kyc");
+        // Redirect based on current onboarding step
+        if (status.onboardingStep === "plan_select") {
+          router.replace("/onboarding/plan");
+        } else {
+          router.replace("/onboarding/kyc");
+        }
       }
     }
   }, [status, router]);
