@@ -41,63 +41,121 @@ export default defineSchema({
     .index("by_code", ["code"])
     .index("by_owner", ["ownerId"]),
 
-  // Accounts - 4 buckets per user (Treasury financial accounts)
-  // Note: Stripe IDs moved to stripeIdentities, goals moved to savingsGoals table,
-  // spending tracking computed from transactions via userStats queries
-  accounts: defineTable({
-    userId: v.id("users"),
-    familyId: v.id("families"),
-    type: v.union(
-      v.literal("spend"),
-      v.literal("save"),
-      v.literal("give"),
-      v.literal("invest")
+  // Ledger Accounts - double-entry bookkeeping accounts
+  // Replaces old "accounts" table. Each user has 4 bucket accounts (spend, save, give, invest)
+  // plus system accounts for Stripe, chore pool, loan pool, etc.
+  ledgerAccounts: defineTable({
+    code: v.string(), // "USR_{userId}_spend" or "SYS_STRIPE_TREASURY"
+    name: v.string(),
+    accountType: v.union(
+      v.literal("asset"),
+      v.literal("liability"),
+      v.literal("equity"),
+      v.literal("expense")
     ),
-    balance: v.number(), // Cents
-    // Limits
+    category: v.union(
+      v.literal("user_bucket"),
+      v.literal("system_external"),
+      v.literal("system_internal"),
+      v.literal("system_suspense")
+    ),
+    userId: v.optional(v.id("users")),
+    familyId: v.optional(v.id("families")),
+    bucketType: v.optional(
+      v.union(
+        v.literal("spend"),
+        v.literal("save"),
+        v.literal("give"),
+        v.literal("invest")
+      )
+    ),
+    cachedBalance: v.number(), // Cents
+    // Spending limits
     dailySpendLimit: v.optional(v.number()),
     weeklySpendLimit: v.optional(v.number()),
     monthlySpendLimit: v.optional(v.number()),
-    createdAt: v.optional(v.number()),
-    updatedAt: v.optional(v.number()),
+    lastReconciled: v.optional(v.number()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   })
+    .index("by_code", ["code"])
     .index("by_user", ["userId"])
-    .index("by_user_type", ["userId", "type"])
+    .index("by_user_bucket", ["userId", "bucketType"])
+    .index("by_category", ["category"])
     .index("by_family", ["familyId"]),
 
-  // Transactions - all money movements
-  transactions: defineTable({
-    userId: v.id("users"),
-    accountId: v.id("accounts"),
-    familyId: v.id("families"),
-    amount: v.number(), // Cents, positive for credits, negative for debits
-    type: v.union(v.literal("credit"), v.literal("debit")),
-    category: v.string(),
+  // Journal Entries - double-entry transaction records
+  // Replaces old "transactions" table. Each entry has a debit and credit account.
+  journalEntries: defineTable({
+    entryId: v.string(), // UUID
+    sequenceNumber: v.number(), // Monotonically increasing
+    debitAccountId: v.id("ledgerAccounts"),
+    creditAccountId: v.id("ledgerAccounts"),
+    amount: v.number(), // Always positive, cents
     description: v.string(),
-    merchantName: v.optional(v.string()),
-    merchantCategory: v.optional(v.string()),
-    // References
-    choreId: v.optional(v.id("chores")),
-    loanId: v.optional(v.id("loans")),
-    transferToAccountId: v.optional(v.id("accounts")),
-    // Stripe
+    category: v.string(), // "deposit", "transfer", "chore_payout", "card_purchase", etc.
+    sourceType: v.string(), // "parent_deposit", "stripe_inbound", "chore_approval", etc.
+    sourceId: v.optional(v.string()),
+    groupId: v.string(), // Links entries in one logical operation
+    createdAt: v.number(),
+    createdBy: v.optional(v.id("users")),
+    // Reversal tracking
+    isReversal: v.optional(v.boolean()),
+    reversesEntryId: v.optional(v.string()),
+    reversedByEntryId: v.optional(v.string()),
+    // Stripe linkage
     stripeTransactionId: v.optional(v.string()),
     stripeAuthorizationId: v.optional(v.string()),
-    // Status
-    status: v.union(
-      v.literal("pending"),
-      v.literal("completed"),
-      v.literal("failed"),
-      v.literal("reversed")
-    ),
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number()),
+    // Original source refs
+    choreId: v.optional(v.id("chores")),
+    loanId: v.optional(v.id("loans")),
   })
-    .index("by_user", ["userId"])
-    .index("by_account", ["accountId"])
-    .index("by_family", ["familyId"])
-    .index("by_created", ["createdAt"])
+    .index("by_entry_id", ["entryId"])
+    .index("by_group_id", ["groupId"])
+    .index("by_debit_account", ["debitAccountId", "createdAt"])
+    .index("by_credit_account", ["creditAccountId", "createdAt"])
+    .index("by_sequence", ["sequenceNumber"])
+    .index("by_source", ["sourceType", "sourceId"])
+    .index("by_user", ["createdBy", "createdAt"])
     .index("by_stripe_transaction", ["stripeTransactionId"]),
+
+  // Reconciliation Runs - audit trail for balance verification
+  reconciliationRuns: defineTable({
+    type: v.union(
+      v.literal("internal"),
+      v.literal("stripe"),
+      v.literal("full")
+    ),
+    status: v.union(
+      v.literal("running"),
+      v.literal("passed"),
+      v.literal("discrepancy_found"),
+      v.literal("failed")
+    ),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    accountsChecked: v.optional(v.number()),
+    discrepancies: v.optional(
+      v.array(
+        v.object({
+          ledgerAccountId: v.id("ledgerAccounts"),
+          cachedBalance: v.number(),
+          computedBalance: v.number(),
+          stripeBalance: v.optional(v.number()),
+          difference: v.number(),
+          autoResolved: v.boolean(),
+        })
+      )
+    ),
+  })
+    .index("by_status", ["status"])
+    .index("by_started", ["startedAt"]),
+
+  // Ledger Sequence - monotonically increasing counter for journal entries
+  ledgerSequence: defineTable({
+    currentSequence: v.number(),
+  }),
 
   // Chores - marketplace listings
   chores: defineTable({
@@ -256,7 +314,7 @@ export default defineSchema({
   // Savings Goals
   savingsGoals: defineTable({
     userId: v.id("users"),
-    accountId: v.id("accounts"),
+    ledgerAccountId: v.id("ledgerAccounts"),
     name: v.string(),
     targetAmount: v.number(),
     currentAmount: v.number(),
@@ -272,7 +330,7 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
-    .index("by_account", ["accountId"])
+    .index("by_ledger_account", ["ledgerAccountId"])
     .index("by_status", ["status"]),
 
   // Processed Stripe Events - for webhook idempotency
@@ -453,7 +511,7 @@ export default defineSchema({
   savingsGoalContributions: defineTable({
     goalId: v.id("savingsGoals"),
     userId: v.id("users"),
-    transactionId: v.optional(v.id("transactions")),
+    journalEntryId: v.optional(v.id("journalEntries")),
     amount: v.number(),
     previousAmount: v.number(),
     newAmount: v.number(),

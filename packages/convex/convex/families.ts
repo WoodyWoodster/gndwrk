@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { ensureUserAccounts } from "./ledger";
 
 // Generate random 6-character code
 function generateCode(): string {
@@ -164,18 +165,8 @@ export const join = mutation({
       });
     }
 
-    // Create the 4 bucket accounts for the new member
-    const bucketTypes = ["spend", "save", "give", "invest"] as const;
-    for (const type of bucketTypes) {
-      await ctx.db.insert("accounts", {
-        userId: user._id,
-        familyId: family._id,
-        type,
-        balance: 0,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
+    // Create ledger accounts for the new member
+    await ensureUserAccounts(ctx, user._id, family._id, ["spend", "save", "give", "invest"]);
 
     // Create initial trust score
     await ctx.db.insert("trustScores", {
@@ -249,6 +240,15 @@ export const updateSettings = mutation({
 
     if (!user || family.ownerId !== user._id) {
       throw new Error("Not authorized");
+    }
+
+    // Validate allocation sums to 100
+    if (updates.defaultAllocation) {
+      const { spend, save, give, invest } = updates.defaultAllocation;
+      const total = spend + save + give + invest;
+      if (total !== 100) {
+        throw new Error(`Allocation percentages must sum to 100, got ${total}`);
+      }
     }
 
     const filteredUpdates = Object.fromEntries(

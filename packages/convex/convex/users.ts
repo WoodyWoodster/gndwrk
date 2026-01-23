@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { ensureUserAccounts } from "./ledger";
 
 // Get current user from Clerk ID
 export const getCurrentUser = query({
@@ -57,15 +58,16 @@ export const getFamilyKids = query({
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
-    // Get user details and accounts for each kid
+    // Get user details and ledger accounts for each kid
     const kidsWithData = await Promise.all(
       kidMembers.map(async (member) => {
         const user = await ctx.db.get(member.userId);
         if (!user) return null;
 
         const accounts = await ctx.db
-          .query("accounts")
+          .query("ledgerAccounts")
           .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .filter((q) => q.eq(q.field("category"), "user_bucket"))
           .collect();
 
         const latestTrustScore = await ctx.db
@@ -74,9 +76,9 @@ export const getFamilyKids = query({
           .order("desc")
           .first();
 
-        const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-        const spendAccount = accounts.find((a) => a.type === "spend");
-        const saveAccount = accounts.find((a) => a.type === "save");
+        const totalBalance = accounts.reduce((sum, acc) => sum + acc.cachedBalance, 0);
+        const spendAccount = accounts.find((a) => a.bucketType === "spend");
+        const saveAccount = accounts.find((a) => a.bucketType === "save");
 
         return {
           id: user._id,
@@ -85,8 +87,8 @@ export const getFamilyKids = query({
           imageUrl: user.imageUrl,
           trustScore: latestTrustScore?.score ?? 500,
           totalBalance: totalBalance / 100,
-          spendBalance: (spendAccount?.balance ?? 0) / 100,
-          saveBalance: (saveAccount?.balance ?? 0) / 100,
+          spendBalance: (spendAccount?.cachedBalance ?? 0) / 100,
+          saveBalance: (saveAccount?.cachedBalance ?? 0) / 100,
         };
       })
     );
@@ -233,18 +235,8 @@ export const createKidByParent = mutation({
       updatedAt: now,
     });
 
-    // Create the 4 bucket accounts for the kid
-    const bucketTypes = ["spend", "save", "give", "invest"] as const;
-    for (const type of bucketTypes) {
-      await ctx.db.insert("accounts", {
-        userId: kidId,
-        familyId: parent.familyId,
-        type,
-        balance: 0,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
+    // Create ledger accounts for the kid
+    await ensureUserAccounts(ctx, kidId, parent.familyId, ["spend", "save", "give", "invest"]);
 
     // Create initial trust score
     await ctx.db.insert("trustScores", {

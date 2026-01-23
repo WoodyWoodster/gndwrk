@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { ensureUserAccounts } from "./ledger";
 
 // Onboarding step type
 const onboardingStepValidator = v.union(
@@ -485,31 +486,14 @@ export const complete = mutation({
 
     const selectedTier = onboardingSession?.selectedTier ?? "family";
 
-    // Check if accounts already exist
-    const existingAccounts = await ctx.db
-      .query("accounts")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
-
-    // Create bucket accounts based on selected tier
+    // Create ledger accounts based on selected tier
     // Starter: only 2 buckets (spend, save)
     // Family/Family+: all 4 buckets
-    if (existingAccounts.length === 0) {
-      const bucketTypes = selectedTier === "starter"
-        ? (["spend", "save"] as const)
-        : (["spend", "save", "give", "invest"] as const);
+    const bucketTypes = selectedTier === "starter"
+      ? (["spend", "save"] as const)
+      : (["spend", "save", "give", "invest"] as const);
 
-      for (const type of bucketTypes) {
-        await ctx.db.insert("accounts", {
-          userId: user._id,
-          familyId: user.familyId,
-          type,
-          balance: 0,
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    }
+    await ensureUserAccounts(ctx, user._id, user.familyId, [...bucketTypes]);
 
     // Mark onboarding as complete
     if (onboardingSession) {

@@ -33,7 +33,7 @@ export const getMySavingsGoals = query({
 // Create a savings goal
 export const create = mutation({
   args: {
-    accountId: v.id("accounts"),
+    accountId: v.id("ledgerAccounts"),
     name: v.string(),
     targetAmount: v.number(),
     deadline: v.optional(v.number()),
@@ -58,7 +58,7 @@ export const create = mutation({
 
     const goalId = await ctx.db.insert("savingsGoals", {
       userId: user._id,
-      accountId: args.accountId,
+      ledgerAccountId: args.accountId,
       name: args.name,
       targetAmount: Math.round(args.targetAmount * 100), // Store in cents
       currentAmount: 0,

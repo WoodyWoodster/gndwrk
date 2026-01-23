@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { createJournalEntry, reverseJournalEntry, getSystemAccount, SYSTEM_ACCOUNTS } from "./ledger";
+import { allocateDeposit } from "./allocation";
 
 /**
  * Amount handling note:
@@ -184,21 +186,20 @@ export const checkSpendingLimit = query({
     const stripeIdentity = await findStripeIdentityByCardId(ctx, cardId);
     if (!stripeIdentity) return false;
 
-    // Find spend account for this user
+    // Find spend ledger account for this user
     const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("bucketType", "spend")
       )
       .unique();
 
     if (!account) return false;
 
     // Check balance
-    if (account.balance < amount) return false;
+    if (account.cachedBalance < amount) return false;
 
     // Calculate time boundaries
-    const now = Date.now();
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -210,11 +211,10 @@ export const checkSpendingLimit = query({
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    // Get debit transactions for spending calculations
-    const transactions = await ctx.db
-      .query("transactions")
-      .withIndex("by_account", (q) => q.eq("accountId", account._id))
-      .filter((q) => q.eq(q.field("type"), "debit"))
+    // Get credit entries (money leaving this account = spending)
+    const creditEntries = await ctx.db
+      .query("journalEntries")
+      .withIndex("by_credit_account", (q) => q.eq("creditAccountId", account._id))
       .collect();
 
     // Calculate spending for each period
@@ -222,11 +222,10 @@ export const checkSpendingLimit = query({
     let weeklySpent = 0;
     let monthlySpent = 0;
 
-    for (const t of transactions) {
-      const txAmount = Math.abs(t.amount);
-      if (t.createdAt >= startOfDay.getTime()) dailySpent += txAmount;
-      if (t.createdAt >= startOfWeek.getTime()) weeklySpent += txAmount;
-      if (t.createdAt >= startOfMonth.getTime()) monthlySpent += txAmount;
+    for (const entry of creditEntries) {
+      if (entry.createdAt >= startOfDay.getTime()) dailySpent += entry.amount;
+      if (entry.createdAt >= startOfWeek.getTime()) weeklySpent += entry.amount;
+      if (entry.createdAt >= startOfMonth.getTime()) monthlySpent += entry.amount;
     }
 
     // Check daily limit
@@ -265,7 +264,7 @@ export const handleFinancialAccountCreated = mutation({
   },
 });
 
-// Handle inbound transfer (deposit)
+// Handle inbound transfer (deposit) - allocates across buckets
 export const handleInboundTransferSucceeded = mutation({
   args: {
     data: treasuryTransferData,
@@ -285,38 +284,21 @@ export const handleInboundTransferSucceeded = mutation({
       return;
     }
 
-    // Find user's spend account (deposits go to spend by default)
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
-      )
-      .unique();
-
-    if (!account) {
-      console.log("Spend account not found for user:", stripeIdentity.userId);
+    const userId = stripeIdentity.userId as Id<"users">;
+    const user = await ctx.db.get(userId);
+    if (!user || !user.familyId) {
+      console.log("User or family not found for:", userId);
       return;
     }
 
-    const amount = data.amount;
-    const now = Date.now();
-
-    await ctx.db.patch(account._id, {
-      balance: account.balance + amount,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("transactions", {
-      userId: account.userId,
-      accountId: account._id,
-      familyId: account.familyId,
-      amount: amount,
-      type: "credit",
-      category: "Deposit",
+    await allocateDeposit(ctx, {
+      userId,
+      familyId: user.familyId,
+      totalAmount: data.amount,
+      sourceType: "stripe_inbound",
+      sourceId: data.id,
       description: data.description || "Inbound transfer",
       stripeTransactionId: data.id,
-      status: "completed",
-      createdAt: now,
     });
   },
 });
@@ -334,23 +316,13 @@ export const handleOutboundTransferSucceeded = mutation({
       if (!shouldProcess) return;
     }
 
-    const transaction = await ctx.db
-      .query("transactions")
-      .withIndex("by_stripe_transaction", (q) =>
-        q.eq("stripeTransactionId", data.id)
-      )
-      .unique();
-
-    if (transaction) {
-      await ctx.db.patch(transaction._id, {
-        status: "completed",
-        updatedAt: Date.now(),
-      });
-    }
+    // Journal entry was already created when the transfer was initiated
+    // Nothing to update - the ledger is already correct
+    console.log("Outbound transfer succeeded:", data.id);
   },
 });
 
-// Handle outbound transfer failed
+// Handle outbound transfer failed - reverse the original journal entry
 export const handleOutboundTransferFailed = mutation({
   args: {
     data: treasuryTransferData,
@@ -363,27 +335,17 @@ export const handleOutboundTransferFailed = mutation({
       if (!shouldProcess) return;
     }
 
-    const transaction = await ctx.db
-      .query("transactions")
+    // Find the original journal entry by stripe transaction ID
+    const originalEntry = await ctx.db
+      .query("journalEntries")
       .withIndex("by_stripe_transaction", (q) =>
         q.eq("stripeTransactionId", data.id)
       )
-      .unique();
+      .first();
 
-    if (transaction) {
-      await ctx.db.patch(transaction._id, {
-        status: "failed",
-        updatedAt: Date.now(),
-      });
-
-      // Refund amount back to account
-      const account = await ctx.db.get(transaction.accountId);
-      if (account) {
-        await ctx.db.patch(account._id, {
-          balance: account.balance + Math.abs(transaction.amount),
-          updatedAt: Date.now(),
-        });
-      }
+    if (originalEntry && !originalEntry.reversedByEntryId) {
+      const reason = data.failure_details?.message || "Outbound transfer failed";
+      await reverseJournalEntry(ctx, originalEntry.entryId, reason);
     }
 
     console.log(
@@ -395,7 +357,7 @@ export const handleOutboundTransferFailed = mutation({
   },
 });
 
-// Handle inbound transfer failed
+// Handle inbound transfer failed - reverse journal entries if any were created
 export const handleInboundTransferFailed = mutation({
   args: {
     data: treasuryTransferData,
@@ -408,18 +370,19 @@ export const handleInboundTransferFailed = mutation({
       if (!shouldProcess) return;
     }
 
-    const transaction = await ctx.db
-      .query("transactions")
+    // Find any journal entries linked to this stripe transaction
+    const entries = await ctx.db
+      .query("journalEntries")
       .withIndex("by_stripe_transaction", (q) =>
         q.eq("stripeTransactionId", data.id)
       )
-      .unique();
+      .collect();
 
-    if (transaction) {
-      await ctx.db.patch(transaction._id, {
-        status: "failed",
-        updatedAt: Date.now(),
-      });
+    const reason = data.failure_details?.message || "Inbound transfer failed";
+    for (const entry of entries) {
+      if (!entry.reversedByEntryId) {
+        await reverseJournalEntry(ctx, entry.entryId, reason);
+      }
     }
 
     console.log(
@@ -431,7 +394,7 @@ export const handleInboundTransferFailed = mutation({
   },
 });
 
-// Handle received credit (incoming funds)
+// Handle received credit (incoming funds) - allocates across buckets
 export const handleReceivedCredit = mutation({
   args: {
     data: treasuryTransferData,
@@ -447,34 +410,18 @@ export const handleReceivedCredit = mutation({
     const stripeIdentity = await findStripeIdentityByTreasuryAccount(ctx, data.financial_account);
     if (!stripeIdentity) return;
 
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
-      )
-      .unique();
+    const userId = stripeIdentity.userId as Id<"users">;
+    const user = await ctx.db.get(userId);
+    if (!user || !user.familyId) return;
 
-    if (!account) return;
-
-    const amount = data.amount;
-    const now = Date.now();
-
-    await ctx.db.patch(account._id, {
-      balance: account.balance + amount,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("transactions", {
-      userId: account.userId,
-      accountId: account._id,
-      familyId: account.familyId,
-      amount: amount,
-      type: "credit",
-      category: data.network === "ach" ? "ACH Transfer" : "Received Credit",
+    await allocateDeposit(ctx, {
+      userId,
+      familyId: user.familyId,
+      totalAmount: data.amount,
+      sourceType: "stripe_received_credit",
+      sourceId: data.id,
       description: data.description || "Received credit",
       stripeTransactionId: data.id,
-      status: "completed",
-      createdAt: now,
     });
   },
 });
@@ -495,34 +442,30 @@ export const handleReceivedDebit = mutation({
     const stripeIdentity = await findStripeIdentityByTreasuryAccount(ctx, data.financial_account);
     if (!stripeIdentity) return;
 
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
+    // Get user's spend account
+    const spendAccount = await ctx.db
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("bucketType", "spend")
       )
       .unique();
 
-    if (!account) return;
+    if (!spendAccount) return;
 
-    const amount = data.amount;
-    const now = Date.now();
+    const cardPurchasesId = await getSystemAccount(ctx, SYSTEM_ACCOUNTS.CARD_PURCHASES);
+    const groupId = `debit_${data.id}_${Date.now()}`;
 
-    await ctx.db.patch(account._id, {
-      balance: account.balance - amount,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("transactions", {
-      userId: account.userId,
-      accountId: account._id,
-      familyId: account.familyId,
-      amount: -amount,
-      type: "debit",
-      category: "Debit",
+    // DR SYS_CARD_PURCHASES / CR user_spend
+    await createJournalEntry(ctx, {
+      debitAccountId: cardPurchasesId,
+      creditAccountId: spendAccount._id,
+      amount: data.amount,
       description: data.description || "Debit",
+      category: "card_purchase",
+      sourceType: "stripe_received_debit",
+      sourceId: data.id,
+      groupId,
       stripeTransactionId: data.id,
-      status: "completed",
-      createdAt: now,
     });
   },
 });
@@ -591,90 +534,78 @@ export const handleIssuingTransaction = mutation({
     const stripeIdentity = await findStripeIdentityByCardId(ctx, data.card.id);
     if (!stripeIdentity) return;
 
-    // Find spend account
-    const account = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", stripeIdentity.userId).eq("type", "spend")
+    // Find spend ledger account
+    const spendAccount = await ctx.db
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", stripeIdentity.userId).eq("bucketType", "spend")
       )
       .unique();
 
-    if (!account) return;
+    if (!spendAccount) return;
 
     const amount = Math.abs(data.amount);
     const isRefund = data.amount > 0 || data.type === "refund";
     const now = Date.now();
+    const groupId = `issuing_${data.id}_${now}`;
 
     if (isRefund) {
-      await ctx.db.patch(account._id, {
-        balance: account.balance + amount,
-        updatedAt: now,
-      });
+      const refundSourceId = await getSystemAccount(ctx, SYSTEM_ACCOUNTS.REFUND_SOURCE);
 
-      await ctx.db.insert("transactions", {
-        userId: account.userId,
-        accountId: account._id,
-        familyId: account.familyId,
-        amount: amount,
-        type: "credit",
-        category: "Refund",
+      // DR user_spend / CR SYS_REFUND_SOURCE
+      await createJournalEntry(ctx, {
+        debitAccountId: spendAccount._id,
+        creditAccountId: refundSourceId,
+        amount,
         description: `Refund from ${data.merchant_data?.name || "merchant"}`,
-        merchantName: data.merchant_data?.name,
-        merchantCategory: data.merchant_data?.category,
+        category: "refund",
+        sourceType: "card_refund",
+        sourceId: data.id,
+        groupId,
         stripeTransactionId: data.id,
         stripeAuthorizationId: data.authorization,
-        status: "completed",
-        createdAt: now,
       });
     } else {
-      await ctx.db.patch(account._id, {
-        balance: account.balance - amount,
-        updatedAt: now,
-      });
+      const cardPurchasesId = await getSystemAccount(ctx, SYSTEM_ACCOUNTS.CARD_PURCHASES);
 
-      await ctx.db.insert("transactions", {
-        userId: account.userId,
-        accountId: account._id,
-        familyId: account.familyId,
-        amount: -amount,
-        type: "debit",
-        category: data.merchant_data?.category || "Purchase",
+      // DR SYS_CARD_PURCHASES / CR user_spend
+      await createJournalEntry(ctx, {
+        debitAccountId: cardPurchasesId,
+        creditAccountId: spendAccount._id,
+        amount,
         description: data.merchant_data?.name || "Card purchase",
-        merchantName: data.merchant_data?.name,
-        merchantCategory: data.merchant_data?.category,
+        category: data.merchant_data?.category || "card_purchase",
+        sourceType: "card_purchase",
+        sourceId: data.id,
+        groupId,
         stripeTransactionId: data.id,
         stripeAuthorizationId: data.authorization,
-        status: "completed",
-        createdAt: now,
       });
 
       // Check if over budget - emit trust score event
-      if (account.monthlySpendLimit) {
-        // Compute monthly spent from transactions instead of using legacy field
+      if (spendAccount.monthlySpendLimit && spendAccount.userId && spendAccount.familyId) {
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const monthlyTransactions = await ctx.db
-          .query("transactions")
-          .withIndex("by_account", (q) => q.eq("accountId", account._id))
-          .filter((q) =>
-            q.and(
-              q.gte(q.field("createdAt"), startOfMonth.getTime()),
-              q.eq(q.field("type"), "debit")
-            )
+        // Compute monthly spent from journal entries
+        const monthlyEntries = await ctx.db
+          .query("journalEntries")
+          .withIndex("by_credit_account", (q) =>
+            q.eq("creditAccountId", spendAccount._id)
           )
+          .filter((q) => q.gte(q.field("createdAt"), startOfMonth.getTime()))
           .collect();
 
-        const monthlySpent = monthlyTransactions.reduce(
-          (sum, t) => sum + Math.abs(t.amount),
+        const monthlySpent = monthlyEntries.reduce(
+          (sum, e) => sum + e.amount,
           0
         );
 
-        if (monthlySpent > account.monthlySpendLimit) {
+        if (monthlySpent > spendAccount.monthlySpendLimit) {
           await ctx.db.insert("trustScoreEvents", {
-            userId: account.userId,
-            familyId: account.familyId,
+            userId: spendAccount.userId,
+            familyId: spendAccount.familyId,
             event: "Exceeded monthly spending limit",
             eventType: "overspent_budget",
             points: -5,

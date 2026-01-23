@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { createJournalEntry, getSystemAccount, SYSTEM_ACCOUNTS } from "./ledger";
 
 // Get all chores for a family
 export const getFamilyChores = query({
@@ -226,11 +227,11 @@ export const approve = mutation({
       throw new Error("Chore is not pending approval");
     }
 
-    // Get kid's spend account
+    // Get kid's spend ledger account
     const kidAccount = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", chore.assignedTo!).eq("type", "spend")
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", chore.assignedTo!).eq("bucketType", "spend")
       )
       .unique();
 
@@ -239,29 +240,29 @@ export const approve = mutation({
     }
 
     const now = Date.now();
+    const groupId = `chore_${choreId}_${now}`;
+    const chorePoolId = await getSystemAccount(ctx, SYSTEM_ACCOUNTS.CHORE_POOL);
 
-    // Parallelize all operations
+    // Create journal entry: DR kid_spend / CR SYS_CHORE_POOL
+    await createJournalEntry(ctx, {
+      debitAccountId: kidAccount._id,
+      creditAccountId: chorePoolId,
+      amount: chore.payout,
+      description: `Chore: ${chore.title}`,
+      category: "chore_payout",
+      sourceType: "chore_approval",
+      sourceId: choreId,
+      groupId,
+      createdBy: user._id,
+      choreId,
+    });
+
+    // Update chore status and record trust score event
     await Promise.all([
       ctx.db.patch(choreId, {
         status: "paid",
         approvedAt: now,
         updatedAt: now,
-      }),
-      ctx.db.patch(kidAccount._id, {
-        balance: kidAccount.balance + chore.payout,
-        updatedAt: now,
-      }),
-      ctx.db.insert("transactions", {
-        userId: chore.assignedTo!,
-        accountId: kidAccount._id,
-        familyId: chore.familyId,
-        amount: chore.payout,
-        type: "credit",
-        category: "Chore",
-        description: `Chore: ${chore.title}`,
-        choreId: choreId,
-        status: "completed",
-        createdAt: now,
       }),
       ctx.db.insert("trustScoreEvents", {
         userId: chore.assignedTo!,

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { createJournalEntry } from "./ledger";
 
-// Get current user's accounts
+// Get current user's accounts (from ledgerAccounts)
 export const getMyAccounts = query({
   args: {},
   handler: async (ctx) => {
@@ -16,14 +17,28 @@ export const getMyAccounts = query({
     if (!user) return null;
 
     const accounts = await ctx.db
-      .query("accounts")
+      .query("ledgerAccounts")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("category"), "user_bucket"),
+          q.neq(q.field("bucketType"), undefined)
+        )
+      )
       .collect();
 
-    // Convert balance from cents to dollars
     return accounts.map((acc) => ({
-      ...acc,
-      balance: acc.balance / 100,
+      _id: acc._id,
+      _creationTime: acc._creationTime,
+      userId: acc.userId,
+      familyId: acc.familyId,
+      type: acc.bucketType!,
+      balance: acc.cachedBalance / 100,
+      dailySpendLimit: acc.dailySpendLimit,
+      weeklySpendLimit: acc.weeklySpendLimit,
+      monthlySpendLimit: acc.monthlySpendLimit,
+      createdAt: acc.createdAt,
+      updatedAt: acc.updatedAt,
     }));
   },
 });
@@ -33,22 +48,37 @@ export const getByUserId = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     const accounts = await ctx.db
-      .query("accounts")
+      .query("ledgerAccounts")
       .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("category"), "user_bucket"),
+          q.neq(q.field("bucketType"), undefined)
+        )
+      )
       .collect();
 
     return accounts.map((acc) => ({
-      ...acc,
-      balance: acc.balance / 100,
+      _id: acc._id,
+      _creationTime: acc._creationTime,
+      userId: acc.userId,
+      familyId: acc.familyId,
+      type: acc.bucketType!,
+      balance: acc.cachedBalance / 100,
+      dailySpendLimit: acc.dailySpendLimit,
+      weeklySpendLimit: acc.weeklySpendLimit,
+      monthlySpendLimit: acc.monthlySpendLimit,
+      createdAt: acc.createdAt,
+      updatedAt: acc.updatedAt,
     }));
   },
 });
 
-// Transfer between buckets
+// Transfer between buckets via journal entry
 export const transfer = mutation({
   args: {
-    fromAccountId: v.id("accounts"),
-    toAccountId: v.id("accounts"),
+    fromAccountId: v.id("ledgerAccounts"),
+    toAccountId: v.id("ledgerAccounts"),
     amount: v.number(), // In dollars
   },
   handler: async (ctx, { fromAccountId, toAccountId, amount }) => {
@@ -76,54 +106,28 @@ export const transfer = mutation({
 
     const amountCents = Math.round(amount * 100);
 
-    if (fromAccount.balance < amountCents) {
-      throw new Error("Insufficient funds");
-    }
+    const groupId = `transfer_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    // Update balances
-    await ctx.db.patch(fromAccountId, {
-      balance: fromAccount.balance - amountCents,
-    });
-    await ctx.db.patch(toAccountId, {
-      balance: toAccount.balance + amountCents,
-    });
-
-    // Create transaction records
-    const now = Date.now();
-
-    await ctx.db.insert("transactions", {
-      userId: user._id,
-      accountId: fromAccountId,
-      familyId: fromAccount.familyId,
-      amount: -amountCents,
-      type: "debit",
-      category: "Transfer",
-      description: `Transfer to ${toAccount.type}`,
-      transferToAccountId: toAccountId,
-      status: "completed",
-      createdAt: now,
-    });
-
-    await ctx.db.insert("transactions", {
-      userId: user._id,
-      accountId: toAccountId,
-      familyId: toAccount.familyId,
+    // DR destination / CR source
+    await createJournalEntry(ctx, {
+      debitAccountId: toAccountId,
+      creditAccountId: fromAccountId,
       amount: amountCents,
-      type: "credit",
-      category: "Transfer",
-      description: `Transfer from ${fromAccount.type}`,
-      status: "completed",
-      createdAt: now,
+      description: `Transfer from ${fromAccount.bucketType} to ${toAccount.bucketType}`,
+      category: "transfer",
+      sourceType: "bucket_transfer",
+      groupId,
+      createdBy: user._id,
     });
 
     return { success: true };
   },
 });
 
-// Set savings goal - creates a new savings goal in the savingsGoals table
+// Set savings goal
 export const setGoal = mutation({
   args: {
-    accountId: v.id("accounts"),
+    accountId: v.id("ledgerAccounts"),
     goal: v.number(), // In dollars
     goalName: v.string(),
     deadline: v.optional(v.number()),
@@ -146,10 +150,9 @@ export const setGoal = mutation({
 
     const now = Date.now();
 
-    // Create a savings goal record
     const goalId = await ctx.db.insert("savingsGoals", {
       userId: user._id,
-      accountId,
+      ledgerAccountId: accountId,
       name: goalName,
       targetAmount: Math.round(goal * 100),
       currentAmount: 0,
@@ -166,7 +169,7 @@ export const setGoal = mutation({
 // Update spending limits (parent only)
 export const setSpendingLimits = mutation({
   args: {
-    accountId: v.id("accounts"),
+    accountId: v.id("ledgerAccounts"),
     dailyLimit: v.optional(v.number()),
     weeklyLimit: v.optional(v.number()),
     monthlyLimit: v.optional(v.number()),
@@ -199,10 +202,10 @@ export const setSpendingLimits = mutation({
   },
 });
 
-// Send money to another family member
+// Send money to another family member via journal entry
 export const sendToFamilyMember = mutation({
   args: {
-    fromAccountId: v.id("accounts"),
+    fromAccountId: v.id("ledgerAccounts"),
     toUserId: v.id("users"),
     amount: v.number(), // In dollars
     note: v.optional(v.string()),
@@ -231,9 +234,9 @@ export const sendToFamilyMember = mutation({
 
     // Get recipient's spend account
     const toAccount = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", toUserId).eq("type", "spend")
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", toUserId).eq("bucketType", "spend")
       )
       .unique();
 
@@ -242,72 +245,23 @@ export const sendToFamilyMember = mutation({
     }
 
     const amountCents = Math.round(amount * 100);
-
-    if (fromAccount.balance < amountCents) {
-      throw new Error("Insufficient funds");
-    }
-
-    const now = Date.now();
     const description = note
       ? `Sent to ${toUser.firstName}: ${note}`
       : `Sent to ${toUser.firstName}`;
-    const receiveDescription = note
-      ? `Received from ${user.firstName}: ${note}`
-      : `Received from ${user.firstName}`;
 
-    // Update balances and create transactions in parallel
-    await Promise.all([
-      ctx.db.patch(fromAccountId, {
-        balance: fromAccount.balance - amountCents,
-      }),
-      ctx.db.patch(toAccount._id, {
-        balance: toAccount.balance + amountCents,
-      }),
-      ctx.db.insert("transactions", {
-        userId: user._id,
-        accountId: fromAccountId,
-        familyId: fromAccount.familyId,
-        amount: -amountCents,
-        type: "debit",
-        category: "Transfer",
-        description,
-        status: "completed",
-        createdAt: now,
-      }),
-      ctx.db.insert("transactions", {
-        userId: toUserId,
-        accountId: toAccount._id,
-        familyId: toAccount.familyId,
-        amount: amountCents,
-        type: "credit",
-        category: "Transfer",
-        description: receiveDescription,
-        status: "completed",
-        createdAt: now,
-      }),
-    ]);
+    const groupId = `send_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    return { success: true };
-  },
-});
-
-// Create accounts for a new user
-export const createForUser = mutation({
-  args: {
-    userId: v.id("users"),
-    familyId: v.id("families"),
-  },
-  handler: async (ctx, { userId, familyId }) => {
-    const bucketTypes = ["spend", "save", "give", "invest"] as const;
-
-    for (const type of bucketTypes) {
-      await ctx.db.insert("accounts", {
-        userId,
-        familyId,
-        type,
-        balance: 0,
-      });
-    }
+    // DR recipient_spend / CR sender_spend
+    await createJournalEntry(ctx, {
+      debitAccountId: toAccount._id,
+      creditAccountId: fromAccountId,
+      amount: amountCents,
+      description,
+      category: "transfer",
+      sourceType: "family_send",
+      groupId,
+      createdBy: user._id,
+    });
 
     return { success: true };
   },

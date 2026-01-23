@@ -85,29 +85,24 @@ export const getSpendingForPeriod = query({
         break;
     }
 
-    // Get spend account for user
+    // Get spend ledger account for user
     const spendAccount = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) => q.eq("userId", userId).eq("type", "spend"))
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) => q.eq("userId", userId).eq("bucketType", "spend"))
       .unique();
 
     if (!spendAccount) return 0;
 
-    // Get debit transactions for the period
-    const transactions = await ctx.db
-      .query("transactions")
-      .withIndex("by_account", (q) => q.eq("accountId", spendAccount._id))
-      .filter((q) =>
-        q.and(
-          q.gte(q.field("createdAt"), startTime),
-          q.eq(q.field("type"), "debit")
-        )
-      )
+    // Get credit entries for the period (money leaving the account = spending)
+    const entries = await ctx.db
+      .query("journalEntries")
+      .withIndex("by_credit_account", (q) => q.eq("creditAccountId", spendAccount._id))
+      .filter((q) => q.gte(q.field("createdAt"), startTime))
       .collect();
 
-    // Sum absolute values of debit transactions
-    const totalSpent = transactions.reduce(
-      (sum, t) => sum + Math.abs(t.amount),
+    // Sum amounts (already positive in journal entries)
+    const totalSpent = entries.reduce(
+      (sum, e) => sum + e.amount,
       0
     );
 
@@ -209,10 +204,8 @@ export const getUserStats = query({
 
 // Get account spending stats (for spend limits checking)
 export const getAccountSpending = query({
-  args: { accountId: v.id("accounts") },
+  args: { accountId: v.id("ledgerAccounts") },
   handler: async (ctx, { accountId }) => {
-    const now = Date.now();
-
     // Calculate time boundaries
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -225,11 +218,10 @@ export const getAccountSpending = query({
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    // Get all debit transactions for the account
-    const transactions = await ctx.db
-      .query("transactions")
-      .withIndex("by_account", (q) => q.eq("accountId", accountId))
-      .filter((q) => q.eq(q.field("type"), "debit"))
+    // Get all credit entries for the account (money leaving = spending)
+    const entries = await ctx.db
+      .query("journalEntries")
+      .withIndex("by_credit_account", (q) => q.eq("creditAccountId", accountId))
       .collect();
 
     // Calculate spending for each period
@@ -237,17 +229,15 @@ export const getAccountSpending = query({
     let weeklySpent = 0;
     let monthlySpent = 0;
 
-    for (const t of transactions) {
-      const amount = Math.abs(t.amount);
-
-      if (t.createdAt >= startOfDay.getTime()) {
-        dailySpent += amount;
+    for (const entry of entries) {
+      if (entry.createdAt >= startOfDay.getTime()) {
+        dailySpent += entry.amount;
       }
-      if (t.createdAt >= startOfWeek.getTime()) {
-        weeklySpent += amount;
+      if (entry.createdAt >= startOfWeek.getTime()) {
+        weeklySpent += entry.amount;
       }
-      if (t.createdAt >= startOfMonth.getTime()) {
-        monthlySpent += amount;
+      if (entry.createdAt >= startOfMonth.getTime()) {
+        monthlySpent += entry.amount;
       }
     }
 

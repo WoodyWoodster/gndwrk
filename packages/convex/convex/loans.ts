@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { createJournalEntry, getSystemAccount, SYSTEM_ACCOUNTS } from "./ledger";
 
 // Get all loans for a family
 export const getFamilyLoans = query({
@@ -172,49 +173,43 @@ export const approve = mutation({
       updatedAt: now,
     });
 
-    // Transfer money to kid's spend account
+    // Transfer money to kid's spend account via ledger
     const kidSpendAccount = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", loan.borrowerId).eq("type", "spend")
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", loan.borrowerId).eq("bucketType", "spend")
       )
       .unique();
 
-    // Parallelize independent operations
-    const operations: Promise<unknown>[] = [
-      // Create first scheduled payment
-      ctx.db.insert("loanPayments", {
-        loanId,
-        userId: loan.borrowerId,
-        amount: weeklyPayment,
-        principal: Math.round(loan.principal / loan.termWeeks),
-        interest: weeklyPayment - Math.round(loan.principal / loan.termWeeks),
-        dueDate: now + 7 * 24 * 60 * 60 * 1000,
-        status: "scheduled",
-      }),
-    ];
+    // Create first scheduled payment
+    await ctx.db.insert("loanPayments", {
+      loanId,
+      userId: loan.borrowerId,
+      amount: weeklyPayment,
+      principal: Math.round(loan.principal / loan.termWeeks),
+      interest: weeklyPayment - Math.round(loan.principal / loan.termWeeks),
+      dueDate: now + 7 * 24 * 60 * 60 * 1000,
+      status: "scheduled",
+    });
 
     if (kidSpendAccount) {
-      operations.push(
-        ctx.db.patch(kidSpendAccount._id, {
-          balance: kidSpendAccount.balance + loan.principal,
-        }),
-        ctx.db.insert("transactions", {
-          userId: loan.borrowerId,
-          accountId: kidSpendAccount._id,
-          familyId: loan.familyId,
-          amount: loan.principal,
-          type: "credit",
-          category: "Loan",
-          description: `Loan: ${loan.purpose}`,
-          loanId: loanId,
-          status: "completed",
-          createdAt: now,
-        })
-      );
-    }
+      const loanPoolId = await getSystemAccount(ctx, SYSTEM_ACCOUNTS.LOAN_POOL);
+      const groupId = `loan_disburse_${loanId}_${now}`;
 
-    await Promise.all(operations);
+      // DR kid_spend / CR SYS_LOAN_POOL
+      await createJournalEntry(ctx, {
+        debitAccountId: kidSpendAccount._id,
+        creditAccountId: loanPoolId,
+        amount: loan.principal,
+        description: `Loan: ${loan.purpose}`,
+        category: "loan_disbursement",
+        sourceType: "loan_approval",
+        sourceId: loanId,
+        groupId,
+        createdBy: user._id,
+        loanId,
+      });
+    }
 
     return { success: true };
   },
@@ -278,41 +273,38 @@ export const makePayment = mutation({
 
     // Get kid's spend account
     const spendAccount = await ctx.db
-      .query("accounts")
-      .withIndex("by_user_type", (q) =>
-        q.eq("userId", user._id).eq("type", "spend")
+      .query("ledgerAccounts")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", user._id).eq("bucketType", "spend")
       )
       .unique();
 
-    if (!spendAccount || spendAccount.balance < paymentAmount) {
+    if (!spendAccount || spendAccount.cachedBalance < paymentAmount) {
       throw new Error("Insufficient funds");
     }
 
     const now = Date.now();
     const newBalance = loan.remainingBalance - paymentAmount;
+    const loanPoolId = await getSystemAccount(ctx, SYSTEM_ACCOUNTS.LOAN_POOL);
+    const groupId = `loan_payment_${loanId}_${now}`;
 
-    // Build transaction record (used in both branches)
-    const transactionInsert = ctx.db.insert("transactions", {
-      userId: user._id,
-      accountId: spendAccount._id,
-      familyId: loan.familyId,
-      amount: -paymentAmount,
-      type: "debit",
-      category: "Loan Payment",
+    // DR SYS_LOAN_POOL / CR kid_spend
+    await createJournalEntry(ctx, {
+      debitAccountId: loanPoolId,
+      creditAccountId: spendAccount._id,
+      amount: paymentAmount,
       description: `Payment: ${loan.purpose}`,
-      loanId: loanId,
-      status: "completed",
-      createdAt: now,
+      category: "loan_payment",
+      sourceType: "loan_payment",
+      sourceId: loanId,
+      groupId,
+      createdBy: user._id,
+      loanId,
     });
 
     // Update loan and related records
     if (newBalance <= 0) {
-      // Loan fully paid - parallelize all independent operations
       await Promise.all([
-        ctx.db.patch(spendAccount._id, {
-          balance: spendAccount.balance - paymentAmount,
-          updatedAt: now,
-        }),
         ctx.db.patch(loanId, {
           status: "paid",
           remainingBalance: 0,
@@ -327,10 +319,8 @@ export const makePayment = mutation({
           points: newBalance < 0 ? 15 : 10,
           createdAt: now,
         }),
-        transactionInsert,
       ]);
     } else {
-      // Check if payment is on time (need this before inserting trust event)
       const scheduledPayment = await ctx.db
         .query("loanPayments")
         .withIndex("by_loan", (q) => q.eq("loanId", loanId))
@@ -339,12 +329,7 @@ export const makePayment = mutation({
 
       const onTime = scheduledPayment ? now <= scheduledPayment.dueDate : true;
 
-      // Parallelize remaining operations
       await Promise.all([
-        ctx.db.patch(spendAccount._id, {
-          balance: spendAccount.balance - paymentAmount,
-          updatedAt: now,
-        }),
         ctx.db.patch(loanId, {
           remainingBalance: newBalance,
           nextPaymentDate: now + 7 * 24 * 60 * 60 * 1000,
@@ -358,7 +343,6 @@ export const makePayment = mutation({
           points: onTime ? 5 : -10,
           createdAt: now,
         }),
-        transactionInsert,
       ]);
     }
 
