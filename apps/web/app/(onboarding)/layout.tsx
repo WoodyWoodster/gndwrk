@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { LogoMark } from "@/components/icons";
+
+export const dynamic = "force-dynamic";
 
 // Floating decorative coin SVG
 function FloatingCoin({ className }: { className?: string }) {
@@ -38,17 +38,11 @@ function FloatingSparkle({ className, color = "#A78BFA" }: { className?: string;
   );
 }
 
-export default async function OnboardingLayout({
+export default function OnboardingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/sign-in");
-  }
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-gray-50">
       {/* Floating decorative elements */}

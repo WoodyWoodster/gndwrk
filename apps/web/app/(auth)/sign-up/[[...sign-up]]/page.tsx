@@ -10,7 +10,7 @@ export default function SignUpPage() {
             card: "shadow-lg",
           },
         }}
-        fallbackRedirectUrl="/onboarding"
+        forceRedirectUrl="/onboarding"
       />
     </div>
   );
