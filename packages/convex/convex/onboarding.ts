@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ensureUserAccounts } from "./ledger";
+import { ensureUser } from "./users";
 
 // Onboarding step type
 const onboardingStepValidator = v.union(
@@ -144,15 +145,7 @@ export const updateStep = mutation({
     step: onboardingStepValidator,
   },
   handler: async (ctx, { step }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) throw new Error("User not found");
+    const user = await ensureUser(ctx);
 
     const now = Date.now();
 

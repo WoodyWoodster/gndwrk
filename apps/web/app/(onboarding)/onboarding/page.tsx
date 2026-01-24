@@ -3,28 +3,18 @@
 import { useQuery } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 export default function OnboardingRouter() {
   const router = useRouter();
   const status = useQuery(api.onboarding.getStatus);
-  const [hasWaited, setHasWaited] = useState(false);
-
-  // Give Convex a moment to sync user from Clerk webhook
-  useEffect(() => {
-    const timer = setTimeout(() => setHasWaited(true), 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (status === undefined) return; // Still loading from Convex
 
-    // If no user record yet (Clerk webhook may not have fired)
-    // Wait a bit then redirect to role selection to start fresh
+    // No user record yet — ensureUser in the mutations will create them
     if (status === null) {
-      if (hasWaited) {
-        router.replace("/onboarding/role");
-      }
+      router.replace("/onboarding/role");
       return;
     }
 
@@ -57,7 +47,7 @@ export default function OnboardingRouter() {
       default:
         router.replace("/onboarding/role");
     }
-  }, [status, router, hasWaited]);
+  }, [status, router]);
 
   return (
     <div className="flex flex-col items-center justify-center">

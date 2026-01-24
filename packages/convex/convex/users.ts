@@ -1,6 +1,32 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, MutationCtx } from "./_generated/server";
 import { ensureUserAccounts } from "./ledger";
+
+/**
+ * Ensures a user record exists for the authenticated Clerk identity.
+ * If the Clerk webhook hasn't created the user yet, creates them from the identity token.
+ */
+export async function ensureUser(ctx: MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Not authenticated");
+
+  const existing = await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+    .unique();
+
+  if (existing) return existing;
+
+  const userId = await ctx.db.insert("users", {
+    clerkId: identity.subject,
+    email: identity.email ?? "",
+    firstName: identity.givenName ?? "",
+    lastName: identity.familyName ?? "",
+    imageUrl: identity.pictureUrl ?? undefined,
+  });
+
+  return (await ctx.db.get(userId))!;
+}
 
 // Get current user from Clerk ID
 export const getCurrentUser = query({
@@ -30,16 +56,7 @@ export const getById = query({
 export const setRole = mutation({
   args: { role: v.union(v.literal("parent"), v.literal("kid")) },
   handler: async (ctx, { role }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) throw new Error("User not found");
-
+    const user = await ensureUser(ctx);
     await ctx.db.patch(user._id, { role });
     return user._id;
   },

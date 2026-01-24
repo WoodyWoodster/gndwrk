@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@gndwrk/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { SignUpIllustration } from "@/components/icons/illustrations";
@@ -12,6 +12,7 @@ export default function RoleSelectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const setRole = useMutation(api.users.setRole);
   const updateStep = useMutation(api.onboarding.updateStep);
+  const status = useQuery(api.onboarding.getStatus);
 
   const handleRoleSelect = async (role: "parent" | "kid") => {
     setIsSubmitting(true);
@@ -30,6 +31,16 @@ export default function RoleSelectPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Wait for Convex to connect and resolve the query
+  if (status === undefined) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary border-t-transparent" />
+        <p className="mt-3 text-sm text-gray-500">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-elevation-2">
